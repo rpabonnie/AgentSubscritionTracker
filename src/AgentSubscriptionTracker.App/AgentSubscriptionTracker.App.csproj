@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>AgentSubscriptionTracker.App</RootNamespace>
+    <AssemblyName>AgentSubscriptionTracker.App</AssemblyName>
+    <UseWPF>true</UseWPF>
+    <!-- Required by the source-generated P/Invoke (LibraryImport) marshalling in
+         Services/WindowsCredentialStore.cs (SYSLIB1062). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+</Project>

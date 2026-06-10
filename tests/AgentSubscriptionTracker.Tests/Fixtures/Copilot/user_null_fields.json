@@ -1,0 +1,19 @@
+{
+  "chat_enabled": null,
+  "copilot_plan": null,
+  "quota_reset_date": null,
+  "quota_reset_date_utc": null,
+  "quota_snapshots": {
+    "premium_interactions": {
+      "entitlement": null,
+      "overage_count": null,
+      "overage_permitted": null,
+      "percent_remaining": null,
+      "quota_id": "premium_interactions",
+      "quota_remaining": null,
+      "remaining": null,
+      "unlimited": false,
+      "timestamp_utc": null
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "state": "Ok",
+  "plan": "individual",
+  "quotaResetDate": "2026-07-01",
+  "retrievedAt": "2026-06-10T12:00:00+00:00",
+  "isFromCache": false,
+  "statusMessage": null,
+  "premiumInteractions": {
+    "key": "premium_interactions",
+    "displayName": "Premium requests",
+    "entitlement": 1500,
+    "remaining": 945,
+    "percentRemaining": 63.0,
+    "unlimited": false,
+    "overageCount": 0,
+    "overagePermitted": false
+  },
+  "chat": {
+    "key": "chat",
+    "displayName": "Chat",
+    "entitlement": null,
+    "remaining": null,
+    "percentRemaining": null,
+    "unlimited": true,
+    "overageCount": 0,
+    "overagePermitted": false
+  },
+  "completions": {
+    "key": "completions",
+    "displayName": "Code completions",
+    "unlimited": true
+  }
+}

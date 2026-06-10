@@ -1,0 +1,11 @@
+{
+  "state": "Ok",
+  "retrievedAt": "2026-06-10T12:00:00+00:00",
+  "isFromCache": false,
+  "fiveHour": { "percentUsed": 63.0, "resetsAt": "2026-06-10T14:30:00+00:00" },
+  "sevenDay": { "percentUsed": 41.5, "resetsAt": "2026-06-14T07:00:00+00:00" },
+  "sevenDayOpus": { "percentUsed": 91.2, "resetsAt": "2026-06-14T07:00:00+00:00" },
+  "sevenDaySonnet": { "percentUsed": 12.0, "resetsAt": "2026-06-14T07:00:00+00:00" },
+  "extraUsage": { "isEnabled": true, "usedCreditsCents": 412, "monthlyLimitCents": 2500, "currency": "USD" },
+  "subscriptionType": "max"
+}

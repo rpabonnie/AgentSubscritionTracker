@@ -1,0 +1,16 @@
+{
+  "state": "Forbidden",
+  "plan": "individual",
+  "quotaResetDate": "2026-07-01",
+  "retrievedAt": "2026-06-10T11:58:30+00:00",
+  "isFromCache": true,
+  "statusMessage": "Copilot token rejected — sign in again via Copilot CLI",
+  "premiumInteractions": {
+    "key": "premium_interactions",
+    "displayName": "Premium requests",
+    "entitlement": 1500,
+    "remaining": 945,
+    "percentRemaining": 63.0,
+    "unlimited": false
+  }
+}

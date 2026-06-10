@@ -1,0 +1,8 @@
+{
+  "state": "TokenExpired",
+  "retrievedAt": "2026-06-10T11:57:00+00:00",
+  "isFromCache": true,
+  "fiveHour": { "percentUsed": 63.0, "resetsAt": "2026-06-10T14:30:00+00:00" },
+  "sevenDay": { "percentUsed": 41.5, "resetsAt": "2026-06-14T07:00:00+00:00" },
+  "subscriptionType": "max"
+}

@@ -1,0 +1,7 @@
+{
+  "token_type": "Bearer",
+  "access_token": "fake-refreshed-access-token-for-tests-0002",
+  "refresh_token": "fake-rotated-refresh-token-for-tests-0002",
+  "expires_in": 28800,
+  "scope": "user:inference user:profile"
+}

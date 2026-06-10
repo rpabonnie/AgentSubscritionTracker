@@ -1,0 +1,12 @@
+{
+  "five_hour": { "utilization": 42.5, "resets_at": "2026-06-10T15:00:00Z" },
+  "seven_day": { "utilization": 80, "resets_at": "2026-06-14T00:00:00Z" },
+  "seven_day_opus": { "utilization": 12.25, "resets_at": "2026-06-14T00:00:00Z" },
+  "seven_day_sonnet": { "utilization": 55, "resets_at": "2026-06-14T00:00:00Z" },
+  "extra_usage": {
+    "is_enabled": true,
+    "used_credits": 1250,
+    "monthly_limit": 5000,
+    "currency": "USD"
+  }
+}

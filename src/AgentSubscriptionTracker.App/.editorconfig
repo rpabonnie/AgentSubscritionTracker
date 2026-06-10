@@ -1,0 +1,9 @@
+# Analyzer adjustments scoped to the app project only (CLAUDE.md: suppress via
+# .editorconfig with a one-line justification when genuinely inapplicable).
+
+[*.cs]
+
+# CA1515: prefer internal types in applications — genuinely inapplicable here: the SPEC-000x
+# contract types are public by binding spec contract and are compiled against by the
+# AgentSubscriptionTracker.Tests assembly.
+dotnet_diagnostic.CA1515.severity = none

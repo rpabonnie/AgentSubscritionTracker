@@ -1,0 +1,17 @@
+{
+  "state": "Ok",
+  "plan": null,
+  "quotaResetDate": null,
+  "retrievedAt": "2026-06-10T12:00:00+00:00",
+  "isFromCache": false,
+  "premiumInteractions": {
+    "key": "premium_interactions",
+    "displayName": "Premium requests",
+    "entitlement": null,
+    "remaining": null,
+    "percentRemaining": 35.0,
+    "unlimited": false
+  },
+  "chat": null,
+  "completions": null
+}

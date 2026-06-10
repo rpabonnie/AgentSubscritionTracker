@@ -1,0 +1,54 @@
+{
+  "access_type_sku": "copilot_individual_pro_seat",
+  "analytics_tracking_id": "00000000-0000-0000-0000-000000000000",
+  "assigned_date": "2025-11-02T18:24:11Z",
+  "can_signup_for_limited": false,
+  "chat_enabled": true,
+  "copilot_plan": "individual_pro",
+  "organization_login_list": [],
+  "organization_list": [],
+  "endpoints": {
+    "api": "https://api.individual.githubcopilot.com",
+    "origin-tracker": "https://origin-tracker.githubusercontent.com",
+    "proxy": "https://copilot-proxy.githubusercontent.com",
+    "telemetry": "https://copilot-telemetry-service.githubusercontent.com"
+  },
+  "quota_reset_date": "2026-07-01",
+  "quota_reset_date_utc": "2026-07-01T00:00:00Z",
+  "quota_snapshots": {
+    "chat": {
+      "entitlement": 0,
+      "overage_count": 0,
+      "overage_permitted": false,
+      "percent_remaining": 100.0,
+      "quota_id": "chat",
+      "quota_remaining": 0.0,
+      "remaining": 0,
+      "unlimited": true,
+      "timestamp_utc": "2026-06-10T21:55:00Z"
+    },
+    "completions": {
+      "entitlement": 0,
+      "overage_count": 0,
+      "overage_permitted": false,
+      "percent_remaining": 100.0,
+      "quota_id": "completions",
+      "quota_remaining": 0.0,
+      "remaining": 0,
+      "unlimited": true,
+      "timestamp_utc": "2026-06-10T21:55:00Z"
+    },
+    "premium_interactions": {
+      "entitlement": 1500,
+      "overage_count": 0,
+      "overage_permitted": true,
+      "percent_remaining": 79.13,
+      "quota_id": "premium_interactions",
+      "quota_remaining": 1187.0,
+      "remaining": 1187,
+      "unlimited": false,
+      "timestamp_utc": "2026-06-10T21:55:00Z"
+    }
+  },
+  "future_unknown_field": { "ignore": "me" }
+}

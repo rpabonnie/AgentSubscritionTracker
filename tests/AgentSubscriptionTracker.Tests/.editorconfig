@@ -1,0 +1,16 @@
+# Analyzer adjustments scoped to the test project only (CLAUDE.md: suppress via
+# .editorconfig with a one-line justification when genuinely inapplicable).
+
+[*.cs]
+
+# CA1707: underscores in identifiers — xUnit convention Method_Scenario_Expectation is intentional in test names.
+dotnet_diagnostic.CA1707.severity = none
+
+# CA2007: ConfigureAwait(false) — genuinely inapplicable; xUnit tests run without a SynchronizationContext.
+dotnet_diagnostic.CA2007.severity = none
+
+# CA1515: internal types preferred in applications — inapplicable to shared test doubles/helpers; visibility is irrelevant inside the test assembly.
+dotnet_diagnostic.CA1515.severity = none
+
+# CA2000: dispose objects before losing scope — inapplicable to in-memory test doubles (FakeHttpMessageHandler et al.) whose disposal is a no-op and whose lifetime ends with the test.
+dotnet_diagnostic.CA2000.severity = none

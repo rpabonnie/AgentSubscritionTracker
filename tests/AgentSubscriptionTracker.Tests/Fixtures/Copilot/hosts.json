@@ -1,0 +1,6 @@
+{
+  "github.com": {
+    "user": "octocat",
+    "oauth_token": "fake-token-for-tests-hosts"
+  }
+}
