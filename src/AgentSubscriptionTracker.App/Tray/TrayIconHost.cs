@@ -130,7 +130,6 @@ public sealed partial class TrayIconHost : IDisposable
         }
 
         _disposed = true;
-        _dwellTimer.Stop();
         DeleteIcon();
         if (_iconHandle != 0)
         {
@@ -138,8 +137,15 @@ public sealed partial class TrayIconHost : IDisposable
             _iconHandle = 0;
         }
 
-        _messageWindow.RemoveHook(WndProc);
-        _messageWindow.Dispose();
+        // The ProcessExit safety net may dispose from a worker thread: the icon is already
+        // deleted above (the part that must never be skipped); HwndSource and DispatcherTimer
+        // are thread-affine, so only touch them on their own dispatcher thread.
+        if (_messageWindow.Dispatcher.CheckAccess())
+        {
+            _dwellTimer.Stop();
+            _messageWindow.RemoveHook(WndProc);
+            _messageWindow.Dispose();
+        }
     }
 
     private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)

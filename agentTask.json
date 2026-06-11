@@ -163,17 +163,17 @@
       "title": "Review: correctness, secret hygiene, spec compliance",
       "description": "Adversarial review of the implementation against SPEC-0001..0003 acceptance criteria, the CLAUDE.md deny list (no secrets read/written to files or logs), and WPF threading correctness. Critical findings must be fixed before done.",
       "type": "review",
-      "status": "pending",
+      "status": "done",
       "assigned_to": "review-agent",
       "depends_on": ["TASK-009"],
       "created_by": "orchestrator",
       "retry_count": 0,
       "max_retries": 3,
       "last_error": "",
-      "notes": "",
+      "notes": "2026-06-11: hygiene sweeps clean (no TLS relaxation, no console/debug logging, no DateTime.Now in src, fixtures fake-token only). All three spec checklists verified. One finding FIXED: TrayIconHost.Dispose could touch thread-affine HwndSource from the ProcessExit worker thread — now NIM_DELETE always runs, window teardown only on its dispatcher thread. 152/152 green after fix.",
       "spec_file": "",
       "created_at": "2026-06-10T22:00:00Z",
-      "updated_at": "2026-06-10T22:00:00Z"
+      "updated_at": "2026-06-11T20:45:00Z"
     },
     {
       "id": "TASK-011",
