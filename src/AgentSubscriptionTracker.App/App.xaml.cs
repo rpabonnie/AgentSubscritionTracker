@@ -5,8 +5,6 @@
 using System.IO;
 using System.Net.Http;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using AgentSubscriptionTracker.App.Services;
 using AgentSubscriptionTracker.App.Tray;
 using AgentSubscriptionTracker.App.ViewModels;
@@ -14,7 +12,7 @@ using AgentSubscriptionTracker.App.Views;
 
 namespace AgentSubscriptionTracker.App;
 
-/// <summary>Tray-only application: no main window, explicit shutdown via the tray menu.</summary>
+/// <summary>Tray-only application: no main window, explicit shutdown via the callout.</summary>
 internal sealed partial class App : Application, IDisposable
 {
     private const string SingleInstanceMutexName = @"Local\AgentSubscriptionTracker.SingleInstance";
@@ -65,10 +63,8 @@ internal sealed partial class App : Application, IDisposable
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
         _trayIcon = new TrayIconHost(iconPath);
         _trayIcon.ThemeSettingChanged += (_, _) => ThemeDetector.ApplyTheme(this);
-        _trayIcon.ContextMenuRequested += (_, _) => ShowContextMenu();
 
-        // The callout's command row is the primary way to operate the app (SPEC-0003 §5.2
-        // amendment); the tray context menu stays as a secondary affordance.
+        // The callout's command row is the way to operate the app.
         var calloutWindow = new CalloutWindow(_viewModel);
         calloutWindow.RefreshRequested += (_, _) => _ = _viewModel.RequestRefreshAsync(RefreshTrigger.Manual);
         calloutWindow.ExitRequested += (_, _) => ExitApplication();
@@ -116,37 +112,6 @@ internal sealed partial class App : Application, IDisposable
         }
 
         _singleInstanceMutex?.Dispose();
-    }
-
-    private void ShowContextMenu()
-    {
-        if (_trayIcon is null || _callout is null || _viewModel is null)
-        {
-            return;
-        }
-
-        // Foreground focus first so the menu dismisses when the user clicks elsewhere.
-        _trayIcon.FocusMessageWindow();
-
-        var refreshItem = new MenuItem { Header = "Refresh now" };
-        refreshItem.Click += (_, _) =>
-        {
-            // Fire-and-forget by contract: without a caller token, RequestRefreshAsync never throws.
-            _ = _viewModel.RequestRefreshAsync(RefreshTrigger.Manual);
-            _callout.Show();
-        };
-
-        // TODO(v1.x): "Start with Windows" toggle writing the app's own HKCU Run value
-        // (SPEC-0003 §5.5 marks it optional for v1).
-
-        var exitItem = new MenuItem { Header = "Exit" };
-        exitItem.Click += (_, _) => ExitApplication();
-
-        var menu = new ContextMenu { Placement = PlacementMode.MousePoint };
-        menu.Items.Add(refreshItem);
-        menu.Items.Add(new Separator());
-        menu.Items.Add(exitItem);
-        menu.IsOpen = true;
     }
 
     private void ExitApplication()
