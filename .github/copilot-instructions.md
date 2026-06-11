@@ -36,7 +36,7 @@ Stack: C# / WPF · Runtime: .NET 10 (`net10.0-windows`) · Tests: `dotnet test`
 - Write secrets, API keys, or connection strings in any committed file
 - Log, print, or persist token values — including in test fixtures (use fake tokens like `fake-token-for-tests`)
 - Disable or relax TLS certificate validation, even "temporarily" or in tests
-- Add telemetry, analytics, or calls to hosts other than `api.anthropic.com` / `api.github.com` without an ADR
+- Add telemetry, analytics, or calls to hosts other than `api.anthropic.com` / `api.github.com` / `platform.claude.com` / `console.anthropic.com` (latter two: OAuth refresh grant only, ADR-0002) without an ADR
 - Request elevation/admin rights or open listening sockets — this app is outbound-only, standard user
 - Skip `tests/` — it is always required, even in personal projects
 - Change the language of an existing module without user approval

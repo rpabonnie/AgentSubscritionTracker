@@ -75,7 +75,7 @@ This app reads OAuth tokens belonging to other applications (Claude Code, GitHub
 
 ### Network
 - HTTPS only, TLS 1.2+; **never** disable or relax certificate validation (no `ServerCertificateCustomValidationCallback` returning true).
-- Outbound calls restricted to known hosts: `api.anthropic.com`, `api.github.com`. No other endpoints without an ADR.
+- Outbound calls restricted to known hosts: `api.anthropic.com`, `api.github.com`, plus `platform.claude.com` / `console.anthropic.com` for the Claude OAuth refresh grant only (ADR-0002). No other endpoints without an ADR.
 - One shared `HttpClient` per service; explicit timeout (≤ 10 s); retry with exponential backoff + jitter; honor `429`/`Retry-After`.
 - Treat API responses as untrusted input: strict `System.Text.Json` deserialization into typed models, bounded payload size, never render unvalidated strings into the UI beyond plain text.
 

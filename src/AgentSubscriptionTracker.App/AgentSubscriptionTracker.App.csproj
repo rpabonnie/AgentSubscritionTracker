@@ -7,8 +7,16 @@
     <AssemblyName>AgentSubscriptionTracker.App</AssemblyName>
     <UseWPF>true</UseWPF>
     <!-- Required by the source-generated P/Invoke (LibraryImport) marshalling in
-         Services/WindowsCredentialStore.cs (SYSLIB1062). -->
+         Services/WindowsCredentialStore.cs (SYSLIB1062) and the fixed-buffer
+         NOTIFYICONDATAW interop in Tray/TrayIconHost.cs. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The tray icon is loaded from disk at runtime (LoadImageW LR_LOADFROMFILE). -->
+    <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
 </Project>
