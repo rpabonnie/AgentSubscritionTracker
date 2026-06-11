@@ -33,6 +33,12 @@ public enum CopilotTokenSource
 
     /// <summary>~/.copilot/config.json (Copilot CLI).</summary>
     CopilotCliConfig,
+
+    /// <summary>Windows Credential Manager, gh CLI keyring targets ("gh:github.com:"). SPEC-0002 §3 step 6.</summary>
+    GhCliCredentialManager,
+
+    /// <summary>%APPDATA%\GitHub CLI\hosts.yml (gh CLI plaintext fallback). SPEC-0002 §3 step 7.</summary>
+    GhCliHostsFile,
 }
 
 /// <summary>A discovered Copilot OAuth token and its source.</summary>
@@ -60,6 +66,9 @@ public sealed record CopilotTokenProviderOptions
 
     /// <summary>Override for %USERPROFILE%. Null = real folder.</summary>
     public string? UserProfilePath { get; init; }
+
+    /// <summary>Override for %APPDATA% (gh CLI hosts.yml fallback). Null = real folder.</summary>
+    public string? RoamingAppDataPath { get; init; }
 }
 
 /// <summary>Tuning knobs for <see cref="CopilotQuotaService"/>.</summary>

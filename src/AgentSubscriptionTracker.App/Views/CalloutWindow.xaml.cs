@@ -31,6 +31,18 @@ public sealed partial class CalloutWindow : Window
         IsVisibleChanged += OnIsVisibleChanged;
     }
 
+    /// <summary>Footer "Refresh" button — the shell triggers a manual refresh.</summary>
+    public event EventHandler? RefreshRequested;
+
+    /// <summary>Footer "Exit" button — the shell shuts the app down.</summary>
+    public event EventHandler? ExitRequested;
+
+    private void OnRefreshClick(object sender, RoutedEventArgs e) =>
+        RefreshRequested?.Invoke(this, EventArgs.Empty);
+
+    private void OnExitClick(object sender, RoutedEventArgs e) =>
+        ExitRequested?.Invoke(this, EventArgs.Empty);
+
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(TrayViewModel.DataAgeText)

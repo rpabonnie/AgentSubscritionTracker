@@ -2,7 +2,7 @@
   "meta": {
     "project": "AgentSubscritionTracker",
     "version": "1.0.0",
-    "last_updated": "2026-06-11T19:30:00Z"
+    "last_updated": "2026-06-11T22:00:00Z"
   },
   "tasks": [
     {
@@ -180,17 +180,68 @@
       "title": "Final acceptance — human checkpoint",
       "description": "Human runs the app, hovers the tray icon, verifies the callout shows live Claude and Copilot data. Set to done to close the milestone.",
       "type": "human_checkpoint",
-      "status": "pending",
+      "status": "failed",
       "assigned_to": "human",
       "depends_on": ["TASK-010"],
+      "created_by": "orchestrator",
+      "retry_count": 1,
+      "max_retries": 1,
+      "last_error": "2026-06-11 human test: Claude showed 'temporarily unavailable' (expired token's OAuth refresh exceeded the 2 s hover budget and was cancelled+mislabeled), Copilot showed 'Not signed in' (2026 Copilot CLI stores no plaintext token; only gh CLI keyring present), and the callout had no commands (Exit only via hard-to-reach context menu).",
+      "notes": "Findings spawned TASK-012 (fixes), TASK-013 (auth-config analysis), TASK-014 (re-acceptance).",
+      "spec_file": "",
+      "created_at": "2026-06-10T22:00:00Z",
+      "updated_at": "2026-06-11T22:00:00Z"
+    },
+    {
+      "id": "TASK-012",
+      "title": "Code: TASK-011 fixes — budget semantics, gh CLI token discovery, callout command row",
+      "description": "Per SPEC-0002/0003 amendments 2026-06-11: (1) per-provider budget no longer cancels in-flight fetches — they publish on completion; (2) Copilot token discovery extended with gh CLI keyring (gh:github.com:) and %APPDATA%/GitHub CLI/hosts.yml; (3) callout footer gets Refresh + Exit buttons so the overlay alone operates the app. All tests green.",
+      "type": "code",
+      "status": "done",
+      "assigned_to": "code-agent",
+      "depends_on": ["TASK-011"],
+      "created_by": "orchestrator",
+      "retry_count": 0,
+      "max_retries": 3,
+      "last_error": "",
+      "notes": "Done 2026-06-11: 158/158 tests green (6 new: 4 gh-discovery, 2 budget semantics); dotnet build 0 warnings; smoke test incl. forced callout + live refresh passed. Sign-in messages now name 'gh auth login'.",
+      "spec_file": "docs/specs/SPEC-0002-copilot-quota-service.md",
+      "created_at": "2026-06-11T21:40:00Z",
+      "updated_at": "2026-06-11T22:00:00Z"
+    },
+    {
+      "id": "TASK-013",
+      "title": "Analysis: authentication configuration strategy (settings page?)",
+      "description": "Evaluate whether a settings page for service authentication is needed, per TASK-011 human feedback. Outcome recorded as ADR.",
+      "type": "review",
+      "status": "done",
+      "assigned_to": "review-agent",
+      "depends_on": ["TASK-011"],
+      "created_by": "orchestrator",
+      "retry_count": 0,
+      "max_retries": 3,
+      "last_error": "",
+      "notes": "ADR-0003: no token-entry settings page (PATs don't work for copilot_internal; Claude usage is OAuth-only) — zero-config discovery extended instead, actionable sign-in messages in the callout, device-flow OAuth deferred, optional read-only connection-status panel as future scope.",
+      "spec_file": "",
+      "created_at": "2026-06-11T21:40:00Z",
+      "updated_at": "2026-06-11T22:00:00Z"
+    },
+    {
+      "id": "TASK-014",
+      "title": "Final acceptance (retry) — human checkpoint",
+      "description": "Human runs the app and verifies: Claude section shows live usage (token auto-refresh may take a few seconds on first hover — data appears while the callout is open), Copilot section shows live quota via the gh CLI token, and the callout's Refresh/Exit buttons work without the context menu. Set to done to close the milestone.",
+      "type": "human_checkpoint",
+      "status": "pending",
+      "assigned_to": "human",
+      "depends_on": ["TASK-012", "TASK-013"],
       "created_by": "orchestrator",
       "retry_count": 0,
       "max_retries": 1,
       "last_error": "",
       "notes": "",
       "spec_file": "",
-      "created_at": "2026-06-10T22:00:00Z",
-      "updated_at": "2026-06-10T22:00:00Z"
+      "created_at": "2026-06-11T21:40:00Z",
+      "updated_at": "2026-06-11T22:00:00Z"
     }
   ]
 }

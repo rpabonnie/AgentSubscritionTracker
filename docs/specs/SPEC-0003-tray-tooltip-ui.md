@@ -5,7 +5,7 @@
 | **Task** | TASK-005 (spec) → TASK-008 (code) |
 | **Author** | spec-writer |
 | **Date** | 2026-06-10 |
-| **Status** | Ready for implementation |
+| **Status** | Implemented; amended 2026-06-11 (TASK-011 feedback: §4.4 step 5 budget semantics, §5.2 callout command row) |
 | **Depends on** | SPEC-0001 (`IClaudeUsageService`), SPEC-0002 (`ICopilotQuotaService`) — consumes their public contracts verbatim |
 | **Related** | CLAUDE.md Security Standards + Engineering Best Practices; ADR-0001 |
 | **Test stubs** | `tests/AgentSubscriptionTracker.Tests/Tray/` + fixtures under `tests/AgentSubscriptionTracker.Tests/Fixtures/Tray/` |
@@ -272,10 +272,11 @@ For Copilot, a non-empty `snapshot.StatusMessage` wins over the fallback. `Displ
    - `Hover`: eligible when never attempted, or when `now − lastAttemptCompletedUtc >= MinInterval` for that provider (`ClaudeMinInterval` / `CopilotMinInterval`).
    - Neither provider eligible ⇒ return a completed task; `IsRefreshing` never becomes true; no service call.
 4. **Execution**: eligible providers run concurrently. Each call gets a linked `CancellationTokenSource` = caller token + `CancelAfter(policy.PerProviderTimeout, timeProvider)`.
-5. **Result handling** per provider:
-   - Snapshot returned ⇒ remember it as `lastSnapshot` and publish `ForClaude/ForCopilot(snapshot, now)`.
-   - Budget timeout or any unexpected exception (services contractually never throw, but the UI fails closed): when a `lastSnapshot` exists, publish `For…(lastSnapshot with { State = Unavailable, IsFromCache = true }, now)` — keep the cached numbers, show the unavailable message; with no `lastSnapshot`, publish a minimal `Unavailable` snapshot (no bars). Never crash, never log snapshot contents.
-   - Record `lastAttemptCompletedUtc = now` for the provider (success **and** failure — failures must not cause hover-hammering either).
+5. **Result handling** per provider *(amended 2026-06-11 — TASK-011 found the original cancel-on-budget rule produced a sticky false "Unavailable" when the first fetch needs an OAuth refresh round-trip and exceeds 2 s)*:
+   - Snapshot returned within the budget ⇒ remember it as `lastSnapshot` and publish `ForClaude/ForCopilot(snapshot, now)`.
+   - **Budget elapsed ⇒ the in-flight service call is NOT cancelled.** The refresh task returns (keeping the previously shown data — cached bars or the Loading placeholder), and the still-running fetch continues in the background; when it completes it is published exactly as if it had finished in time (and updates `lastSnapshot`). The hover promise stays ≤ 2 s while slow first fetches (token refresh, cold TLS) still land.
+   - Any unexpected exception (services contractually never throw, but the UI fails closed): when a `lastSnapshot` exists, publish `For…(lastSnapshot with { State = Unavailable, IsFromCache = true }, now)` — keep the cached numbers, show the unavailable message; with no `lastSnapshot`, publish a minimal `Unavailable` snapshot (no bars). Never crash, never log snapshot contents.
+   - Record `lastAttemptCompletedUtc = now` for the provider when the attempt completes or its budget elapses (success **and** failure — failures must not cause hover-hammering either). `Manual` refresh bypasses the gate, so a user can always force a retry.
 6. **Notifications**: raise `PropertyChanged` for `Claude`/`Copilot` (when rebuilt), and for `IsRefreshing` and `DataAgeText` around the refresh. `IsRefreshing` is `true` while any provider call is outstanding.
 7. The view-model performs **no UI work** (no Dispatcher); the shell guarantees dispatcher-thread calls.
 
@@ -293,6 +294,13 @@ For Copilot, a non-empty `snapshot.StatusMessage` wins over the fallback. `Displ
 ### 5.2 Callout window (`CalloutWindow`)
 
 `WindowStyle=None`, `AllowsTransparency=True`, transparent background with a single root `Border` (`CornerRadius=8`, 1-px theme border, drop shadow), `Topmost=True`, `ShowActivated=False`, `ShowInTaskbar=False`, `ResizeMode=NoResize`, fixed width ~340 DIP. Content: app title row; Claude section (header + `PlanText`, bars as slim progress bars colored by `Severity` — accent/amber/red — with `ValueText` right-aligned and `ResetText` subtext, or `StateMessage` when present); separator; Copilot section (same template); footer row bound to `DataAgeText` (+ `IsStale` ⇒ "(cached)" suffix). `DataContext = TrayViewModel`; a `DispatcherTimer` (1 s, running only while the callout is visible) re-raises `DataAgeText` so the age ticks.
+
+**(Amendment 2026-06-11, TASK-011 feedback.)** The callout footer carries a **command row** so the
+callout alone can operate the app (the tray context menu remains as a secondary affordance but must
+not be required): a *Refresh* button (`RequestRefreshAsync(RefreshTrigger.Manual)`) and an *Exit*
+button (same clean-shutdown path as the context-menu Exit). Buttons are theme-styled, small, and
+clickable without activating the window (`ShowActivated=False` is unaffected — hovering the callout
+keeps it open via the §5.3 pointer watch).
 
 ### 5.3 Open/close + positioning (`CalloutController`)
 

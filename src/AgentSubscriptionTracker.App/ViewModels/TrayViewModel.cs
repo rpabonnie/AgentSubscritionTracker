@@ -137,22 +137,40 @@ public sealed class TrayViewModel : INotifyPropertyChanged
 
     private async Task RefreshClaudeAsync(CancellationToken callerToken)
     {
+        // §4.4 step 5 (amended 2026-06-11): the budget bounds how long this refresh pass
+        // waits, but never cancels the underlying fetch — a slow first fetch (OAuth refresh
+        // round-trip, cold TLS) keeps running and is published when it lands.
+        var fetch = _claudeService.GetUsageAsync(callerToken);
+        var withinBudget = await WaitWithinBudgetAsync(fetch, callerToken).ConfigureAwait(false);
+        if (withinBudget)
+        {
+            await PublishClaudeAsync(fetch, callerToken).ConfigureAwait(false);
+            return;
+        }
+
+        // Budget elapsed: keep showing the current data, gate further hovers, and let the
+        // in-flight fetch publish itself on completion (cancellation no longer applies).
+        _claudeAttemptCompletedUtc = _timeProvider.GetUtcNow();
+        _ = PublishClaudeAsync(fetch, CancellationToken.None);
+    }
+
+    private async Task PublishClaudeAsync(Task<ClaudeUsageSnapshot> fetch, CancellationToken callerToken)
+    {
         ClaudeUsageSnapshot snapshot;
         try
         {
-            using var budget = new CancellationTokenSource(_policy.PerProviderTimeout, _timeProvider);
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(callerToken, budget.Token);
-            snapshot = await _claudeService.GetUsageAsync(linked.Token).ConfigureAwait(false);
+            snapshot = await fetch.ConfigureAwait(false);
             _lastClaudeSnapshot = snapshot;
         }
         catch (OperationCanceledException) when (callerToken.IsCancellationRequested)
         {
+            _claudeAttemptCompletedUtc = _timeProvider.GetUtcNow();
             throw;
         }
         catch (Exception)
         {
-            // Fail closed (§4.4): budget timeout or unexpected service exception — keep cached
-            // numbers when available, present Unavailable. Exception details are never surfaced.
+            // Fail closed (§4.4): unexpected service exception — keep cached numbers when
+            // available, present Unavailable. Exception details are never surfaced.
             snapshot = _lastClaudeSnapshot is { } last
                 ? last with { State = ClaudeProviderState.Unavailable, IsFromCache = true }
                 : new ClaudeUsageSnapshot
@@ -161,12 +179,9 @@ public sealed class TrayViewModel : INotifyPropertyChanged
                     RetrievedAt = _timeProvider.GetUtcNow(),
                 };
         }
-        finally
-        {
-            // Success and failure both count: failures must not cause hover-hammering.
-            _claudeAttemptCompletedUtc = _timeProvider.GetUtcNow();
-        }
 
+        // Success and failure both count: failures must not cause hover-hammering.
+        _claudeAttemptCompletedUtc = _timeProvider.GetUtcNow();
         _claude = ProviderViewModel.ForClaude(snapshot, _timeProvider.GetUtcNow());
         OnPropertyChanged(nameof(Claude));
         OnPropertyChanged(nameof(DataAgeText));
@@ -174,21 +189,35 @@ public sealed class TrayViewModel : INotifyPropertyChanged
 
     private async Task RefreshCopilotAsync(CancellationToken callerToken)
     {
+        // See RefreshClaudeAsync for the budget semantics.
+        var fetch = _copilotService.GetSnapshotAsync(callerToken);
+        var withinBudget = await WaitWithinBudgetAsync(fetch, callerToken).ConfigureAwait(false);
+        if (withinBudget)
+        {
+            await PublishCopilotAsync(fetch, callerToken).ConfigureAwait(false);
+            return;
+        }
+
+        _copilotAttemptCompletedUtc = _timeProvider.GetUtcNow();
+        _ = PublishCopilotAsync(fetch, CancellationToken.None);
+    }
+
+    private async Task PublishCopilotAsync(Task<CopilotQuotaSnapshot> fetch, CancellationToken callerToken)
+    {
         CopilotQuotaSnapshot snapshot;
         try
         {
-            using var budget = new CancellationTokenSource(_policy.PerProviderTimeout, _timeProvider);
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(callerToken, budget.Token);
-            snapshot = await _copilotService.GetSnapshotAsync(linked.Token).ConfigureAwait(false);
+            snapshot = await fetch.ConfigureAwait(false);
             _lastCopilotSnapshot = snapshot;
         }
         catch (OperationCanceledException) when (callerToken.IsCancellationRequested)
         {
+            _copilotAttemptCompletedUtc = _timeProvider.GetUtcNow();
             throw;
         }
         catch (Exception)
         {
-            // Fail closed (§4.4); see RefreshClaudeAsync.
+            // Fail closed (§4.4); see PublishClaudeAsync.
             snapshot = _lastCopilotSnapshot is { } last
                 ? last with { State = CopilotProviderState.Unavailable, IsFromCache = true }
                 : new CopilotQuotaSnapshot
@@ -197,14 +226,36 @@ public sealed class TrayViewModel : INotifyPropertyChanged
                     RetrievedAt = _timeProvider.GetUtcNow(),
                 };
         }
-        finally
-        {
-            _copilotAttemptCompletedUtc = _timeProvider.GetUtcNow();
-        }
 
+        _copilotAttemptCompletedUtc = _timeProvider.GetUtcNow();
         _copilot = ProviderViewModel.ForCopilot(snapshot, _timeProvider.GetUtcNow());
         OnPropertyChanged(nameof(Copilot));
         OnPropertyChanged(nameof(DataAgeText));
+    }
+
+    /// <summary>
+    /// True when the fetch settled inside <see cref="RefreshPolicy.PerProviderTimeout"/>;
+    /// false when the budget elapsed first. Throws only for caller cancellation.
+    /// </summary>
+    private async Task<bool> WaitWithinBudgetAsync(Task fetch, CancellationToken callerToken)
+    {
+        if (fetch.IsCompleted)
+        {
+            return true;
+        }
+
+        using var budgetCts = CancellationTokenSource.CreateLinkedTokenSource(callerToken);
+        var budget = Task.Delay(_policy.PerProviderTimeout, _timeProvider, budgetCts.Token);
+        var first = await Task.WhenAny(fetch, budget).ConfigureAwait(false);
+        if (first == fetch)
+        {
+            // Release the timer; the budget task's cancellation is expected and unobserved.
+            await budgetCts.CancelAsync().ConfigureAwait(false);
+            return true;
+        }
+
+        callerToken.ThrowIfCancellationRequested();
+        return false;
     }
 
     private void SetIsRefreshing(bool value)
