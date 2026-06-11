@@ -18,9 +18,9 @@ public readonly record struct TrayIconRect(int Left, int Top, int Right, int Bot
 
 /// <summary>
 /// Owns the notification-area icon: NIM_ADD/NIM_SETVERSION on startup, re-add on Explorer
-/// restart (TaskbarCreated broadcast), NIM_DELETE on every exit path. Raises hover/click/
-/// context-menu events for the shell; a mouse-dwell timer (~400 ms) covers shells that never
-/// deliver NIN_POPUPOPEN.
+/// restart (TaskbarCreated broadcast), NIM_DELETE on every exit path. Raises hover/click
+/// events for the shell; a mouse-dwell timer (~400 ms) covers shells that never deliver
+/// NIN_POPUPOPEN.
 /// </summary>
 public sealed partial class TrayIconHost : IDisposable
 {
@@ -29,7 +29,6 @@ public sealed partial class TrayIconHost : IDisposable
 
     private const int WmMouseMove = 0x0200;
     private const int WmLButtonUp = 0x0202;
-    private const int WmContextMenu = 0x007B;
     private const int WmSettingChange = 0x001A;
     private const int NinSelect = 0x0400;
     private const int NinKeySelect = 0x0401;
@@ -41,8 +40,6 @@ public sealed partial class TrayIconHost : IDisposable
     private const uint NimSetVersion = 4;
     private const uint NifMessage = 0x01;
     private const uint NifIcon = 0x02;
-    private const uint NifTip = 0x04;
-    private const uint NifShowTip = 0x80;
     private const uint NotifyIconVersion4 = 4;
 
     private readonly HwndSource _messageWindow;
@@ -89,9 +86,6 @@ public sealed partial class TrayIconHost : IDisposable
     /// <summary>Left-click / keyboard select on the icon (toggle callout).</summary>
     public event EventHandler? IconClicked;
 
-    /// <summary>Right-click / WM_CONTEXTMENU on the icon.</summary>
-    public event EventHandler? ContextMenuRequested;
-
     /// <summary>WM_SETTINGCHANGE with "ImmersiveColorSet" — the app theme flipped.</summary>
     public event EventHandler? ThemeSettingChanged;
 
@@ -114,12 +108,6 @@ public sealed partial class TrayIconHost : IDisposable
         rect = default;
         return false;
     }
-
-    /// <summary>
-    /// Brings the hidden message window to the foreground so a tray context menu dismisses
-    /// correctly when the user clicks elsewhere (SPEC-0003 §5.5).
-    /// </summary>
-    public void FocusMessageWindow() => NativeMethods.SetForegroundWindow(_messageWindow.Handle);
 
     /// <inheritdoc />
     public void Dispose()
@@ -198,10 +186,6 @@ public sealed partial class TrayIconHost : IDisposable
                 _dwellTimer.Stop();
                 IconClicked?.Invoke(this, EventArgs.Empty);
                 break;
-            case WmContextMenu:
-                _dwellTimer.Stop();
-                ContextMenuRequested?.Invoke(this, EventArgs.Empty);
-                break;
             default:
                 break;
         }
@@ -213,14 +197,9 @@ public sealed partial class TrayIconHost : IDisposable
     private unsafe void AddIcon()
     {
         var data = NewIconData();
-        data.Flags = NifMessage | NifIcon | NifTip | NifShowTip;
+        data.Flags = NifMessage | NifIcon;
         data.CallbackMessage = TrayCallbackMessage;
         data.IconHandle = _iconHandle;
-
-        const string tip = "AgentSubscriptionTracker";
-        var destination = new Span<char>(data.Tip, 128);
-        tip.AsSpan().CopyTo(destination);
-        destination[tip.Length] = '\0';
 
         NativeMethods.Shell_NotifyIcon(NimAdd, ref data);
         data.VersionOrTimeout = NotifyIconVersion4;
@@ -291,11 +270,6 @@ public sealed partial class TrayIconHost : IDisposable
         [LibraryImport("user32.dll", EntryPoint = "GetSystemMetrics")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         internal static partial int GetSystemMetrics(int index);
-
-        [LibraryImport("user32.dll", EntryPoint = "SetForegroundWindow")]
-        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static partial bool SetForegroundWindow(nint window);
 
         /// <summary>Mirror of the native NOTIFYICONDATAW (version-4 layout).</summary>
         [StructLayout(LayoutKind.Sequential)]
