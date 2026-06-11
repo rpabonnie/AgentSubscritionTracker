@@ -1,0 +1,15 @@
+<!-- SPEC-0003 §5.4 — light theme brushes for the callout. -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <SolidColorBrush x:Key="CalloutBackgroundBrush" Color="#FFF7F8FA" />
+    <SolidColorBrush x:Key="CalloutBorderBrush" Color="#FFD4D8E0" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FF1B1F27" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF5C6573" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#FF3B62D9" />
+    <SolidColorBrush x:Key="WarningBrush" Color="#FFB97C12" />
+    <SolidColorBrush x:Key="CriticalBrush" Color="#FFC93C35" />
+    <SolidColorBrush x:Key="BarTrackBrush" Color="#FFE3E6EC" />
+    <SolidColorBrush x:Key="SeparatorBrush" Color="#FFE8EAEF" />
+
+</ResourceDictionary>

@@ -7,3 +7,9 @@
 # contract types are public by binding spec contract and are compiled against by the
 # AgentSubscriptionTracker.Tests assembly.
 dotnet_diagnostic.CA1515.severity = none
+
+[ViewModels/TrayViewModel.cs]
+
+# CA1031: SPEC-0003 §4.4 requires the refresh orchestration to fail closed on ANY unexpected
+# provider exception (present Unavailable, never crash the tray) — a general catch is the contract.
+dotnet_diagnostic.CA1031.severity = none
