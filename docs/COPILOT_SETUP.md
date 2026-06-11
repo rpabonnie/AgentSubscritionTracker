@@ -33,6 +33,10 @@ The token discovery chain (first hit wins, all in memory only):
 3. `%LOCALAPPDATA%\github-copilot\hosts.json`.
 4. `%USERPROFILE%\.config\github-copilot\apps.json`, then `hosts.json` (older plugins).
 5. `%USERPROFILE%\.copilot\config.json` (Copilot CLI plaintext fallback).
+6. **Windows Credential Manager**, gh CLI keyring entry `gh:github.com:` — the GitHub CLI's
+   OAuth token is accepted by the quota endpoint (added 2026-06-11; the 2026 Copilot CLI no
+   longer stores a plaintext token in locations 1–5).
+7. `%APPDATA%\GitHub CLI\hosts.yml` (gh CLI plaintext fallback when no OS keyring).
 
 VS Code stores its Copilot token in encrypted secret storage; the widget does **not**
 (and cannot) read it. Signing in to Copilot inside VS Code alone is not enough.
@@ -42,9 +46,12 @@ VS Code stores its Copilot token in encrypted secret storage; the widget does **
 Pick any one of these; afterwards the widget will discover the token automatically on
 its next refresh (≤ 30 s debounce):
 
-- **Copilot CLI (recommended)** — install the GitHub Copilot CLI and run its login flow
-  (`copilot` → `/login`). It stores the token in Windows Credential Manager under
-  `copilot-cli`. See
+- **GitHub CLI (recommended)** — `gh auth login`. The gh keyring token is the most reliable
+  source on current setups (verified working against the quota endpoint) and gh is GitHub's
+  official CLI.
+- **Copilot CLI** — install the GitHub Copilot CLI and run its login flow
+  (`copilot` → `/login`). Note: 2026 CLI builds keep the token in internal storage the widget
+  cannot read — if the widget still shows "Not signed in", use `gh auth login` instead. See
   <https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli>.
 - **JetBrains IDE plugin** — sign in to GitHub Copilot in any JetBrains IDE; it writes
   `%LOCALAPPDATA%\github-copilot\apps.json`.

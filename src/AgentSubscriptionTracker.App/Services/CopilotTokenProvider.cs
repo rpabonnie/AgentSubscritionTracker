@@ -11,7 +11,8 @@ namespace AgentSubscriptionTracker.App.Services;
 /// Discovers a locally stored GitHub Copilot OAuth token using the research-verified
 /// chain: Windows Credential Manager ("copilot-cli") → %LOCALAPPDATA%\github-copilot
 /// apps.json/hosts.json → ~/.config/github-copilot apps.json/hosts.json →
-/// ~/.copilot/config.json. First non-empty token wins.
+/// ~/.copilot/config.json → gh CLI keyring ("gh:github.com:") → gh CLI hosts.yml
+/// (SPEC-0002 §3 incl. the 2026-06-11 amendment). First non-empty token wins.
 /// </summary>
 public sealed class CopilotTokenProvider : ICopilotTokenProvider
 {
@@ -19,9 +20,14 @@ public sealed class CopilotTokenProvider : ICopilotTokenProvider
     private const string GitHubKeyPrefix = "github.com";
     private const string OAuthTokenProperty = "oauth_token";
 
+    // gh CLI keyring targets (go-keyring wincred format "service:user"; the active-account
+    // entry has an empty user). Verified: the blob is the raw gh OAuth token.
+    private static readonly string[] GhCredentialTargets = ["gh:github.com:", "gh:github.com"];
+
     private readonly ICopilotCredentialStore _credentialStore;
     private readonly string _localAppDataPath;
     private readonly string _userProfilePath;
+    private readonly string _roamingAppDataPath;
 
     /// <summary>Creates the provider; path overrides default to the real user folders.</summary>
     public CopilotTokenProvider(
@@ -34,6 +40,8 @@ public sealed class CopilotTokenProvider : ICopilotTokenProvider
             ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         _userProfilePath = options?.UserProfilePath
             ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        _roamingAppDataPath = options?.RoamingAppDataPath
+            ?? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
     }
 
     /// <inheritdoc />
@@ -81,7 +89,84 @@ public sealed class CopilotTokenProvider : ICopilotTokenProvider
             return new CopilotToken(cliToken, CopilotTokenSource.CopilotCliConfig);
         }
 
+        // 6. gh CLI keyring entries in Windows Credential Manager (SPEC-0002 §3 step 6:
+        //    Copilot CLI ≥ 2026 stores no plaintext token; the gh OAuth token is accepted
+        //    by copilot_internal/user).
+        foreach (var target in GhCredentialTargets)
+        {
+            if (ExtractTokenFromCredentialBlob(_credentialStore.ReadSecret(target)) is { } ghSecret)
+            {
+                return new CopilotToken(ghSecret, CopilotTokenSource.GhCliCredentialManager);
+            }
+        }
+
+        // 7. %APPDATA%\GitHub CLI\hosts.yml (gh CLI plaintext fallback, no OS keyring).
+        if (TryReadGhHostsYamlToken(Path.Combine(_roamingAppDataPath, "GitHub CLI", "hosts.yml")) is { } ghFileToken)
+        {
+            return new CopilotToken(ghFileToken, CopilotTokenSource.GhCliHostsFile);
+        }
+
         return null;
+    }
+
+    /// <summary>
+    /// Minimal hosts.yml scan (no YAML dependency): the first "oauth_token: &lt;value&gt;" line
+    /// inside the "github.com:" host block. Any IO/format issue yields null.
+    /// </summary>
+    private static string? TryReadGhHostsYamlToken(string path)
+    {
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return null;
+            }
+
+            var insideGitHubHost = false;
+            foreach (var line in File.ReadLines(path))
+            {
+                if (line.Length == 0)
+                {
+                    continue;
+                }
+
+                var isHostHeader = !char.IsWhiteSpace(line[0]) && line.TrimEnd().EndsWith(':');
+                if (isHostHeader)
+                {
+                    insideGitHubHost = line.TrimEnd().TrimEnd(':').Trim() == GitHubKeyPrefix;
+                    continue;
+                }
+
+                if (!insideGitHubHost)
+                {
+                    continue;
+                }
+
+                var trimmed = line.Trim();
+                if (trimmed.StartsWith(OAuthTokenProperty + ":", StringComparison.Ordinal))
+                {
+                    var value = trimmed[(OAuthTokenProperty.Length + 1)..].Trim().Trim('"', '\'');
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        return value;
+                    }
+                }
+            }
+
+            return null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+        catch (System.Security.SecurityException)
+        {
+            return null;
+        }
     }
 
     /// <summary>

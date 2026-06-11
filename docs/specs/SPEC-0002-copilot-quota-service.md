@@ -5,7 +5,7 @@
 | **Task** | TASK-004 (spec) → TASK-007 (code) |
 | **Author** | spec-writer |
 | **Date** | 2026-06-10 |
-| **Status** | Ready for implementation |
+| **Status** | Implemented; amended 2026-06-11 (TASK-011 feedback: gh CLI token fallback — see §3 steps 6–7) |
 | **Research basis** | `docs/COPILOT_QUOTA_API_RESEARCH.md` (verified 2026-06-10) |
 | **Related** | ADR-0001 (Windows Credential Manager), CLAUDE.md Security Standards |
 
@@ -94,12 +94,14 @@ public interface ICopilotQuotaService
 
 public enum CopilotTokenSource
 {
-    CredentialManager,    // Windows Credential Manager, service "copilot-cli"
-    AppsJson,             // %LOCALAPPDATA%\github-copilot\apps.json
-    HostsJson,            // %LOCALAPPDATA%\github-copilot\hosts.json
-    UserConfigAppsJson,   // %USERPROFILE%\.config\github-copilot\apps.json
-    UserConfigHostsJson,  // %USERPROFILE%\.config\github-copilot\hosts.json
-    CopilotCliConfig,     // %USERPROFILE%\.copilot\config.json
+    CredentialManager,       // Windows Credential Manager, service "copilot-cli"
+    AppsJson,                // %LOCALAPPDATA%\github-copilot\apps.json
+    HostsJson,               // %LOCALAPPDATA%\github-copilot\hosts.json
+    UserConfigAppsJson,      // %USERPROFILE%\.config\github-copilot\apps.json
+    UserConfigHostsJson,     // %USERPROFILE%\.config\github-copilot\hosts.json
+    CopilotCliConfig,        // %USERPROFILE%\.copilot\config.json
+    GhCliCredentialManager,  // Windows Credential Manager, gh CLI keyring ("gh:github.com:") — amendment 2026-06-11
+    GhCliHostsFile,          // %APPDATA%\GitHub CLI\hosts.yml — amendment 2026-06-11
 }
 
 public sealed record CopilotToken(string Value, CopilotTokenSource Source);
@@ -124,6 +126,7 @@ public sealed record CopilotTokenProviderOptions
     // Test overrides; null → Environment.GetFolderPath defaults.
     public string? LocalAppDataPath { get; init; }   // default: LocalApplicationData
     public string? UserProfilePath { get; init; }    // default: UserProfile
+    public string? RoamingAppDataPath { get; init; } // default: ApplicationData — amendment 2026-06-11
 }
 
 public sealed class CopilotTokenProvider : ICopilotTokenProvider
@@ -169,6 +172,8 @@ Exactly the research-verified order. First hit with a non-empty token wins; ever
 3. `{LocalAppDataPath}\github-copilot\hosts.json` — JSON object; take the entry whose key is `"github.com"` (or starts with `"github.com"`) and read its `oauth_token`. Source: `HostsJson`.
 4. `{UserProfilePath}\.config\github-copilot\apps.json` then `hosts.json` — same parsing as 2/3. Sources: `UserConfigAppsJson` / `UserConfigHostsJson`.
 5. `{UserProfilePath}\.copilot\config.json` — Copilot CLI plaintext fallback. Accept a top-level non-empty string `oauth_token`, or `github.com` → object → `oauth_token` (tolerant: first match wins). Source: `CopilotCliConfig`.
+6. **(Amendment 2026-06-11, TASK-011 feedback.)** Windows Credential Manager, gh CLI keyring targets `"gh:github.com:"` then `"gh:github.com"` — the raw blob is the gh OAuth token (verified: blob equals `gh auth token` output). Same JSON-or-raw blob handling as step 1. Source: `GhCliCredentialManager`. Rationale: Copilot CLI ≥ 2026 no longer stores a plaintext `oauth_token` in any of steps 1–5 (verified on a signed-in machine: `~/.copilot/config.json` carries only settings), while a gh CLI OAuth token is accepted by `copilot_internal/user` (verified live: HTTP 200 with full quota snapshots).
+7. **(Amendment 2026-06-11.)** `{RoamingAppDataPath}\GitHub CLI\hosts.yml` — gh CLI plaintext fallback used when no OS keyring is available. Minimal line scan (no YAML dependency): the first `oauth_token: <value>` line inside the `github.com:` host block. Source: `GhCliHostsFile`.
 
 If the chain is empty → return `null`. The service maps this to `NotSignedIn` with a `StatusMessage` that **must contain the phrase `"Copilot CLI"`** (sign-in guidance per research: "Sign in via Copilot CLI (or JetBrains/Neovim plugin)"). Do **not** attempt VS Code's encrypted secret storage.
 

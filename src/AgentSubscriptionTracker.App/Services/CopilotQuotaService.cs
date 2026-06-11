@@ -32,11 +32,11 @@ public sealed class CopilotQuotaService : ICopilotQuotaService, IDisposable
     // Fixed, friendly, token-free status texts (SPEC-0002 §6 redaction: error response
     // bodies are never echoed; NotSignedIn guidance must mention "Copilot CLI").
     private const string NotSignedInMessage =
-        "Not signed in to GitHub Copilot. Sign in with the Copilot CLI (or the JetBrains/Neovim plugin).";
+        "Not signed in to GitHub Copilot. Run 'gh auth login' (GitHub CLI) or sign in with the Copilot CLI / JetBrains plugin.";
     private const string TokenRejectedMessage =
-        "The stored GitHub Copilot token was rejected. Sign in again with the Copilot CLI (or the JetBrains/Neovim plugin).";
+        "The stored GitHub token was rejected. Run 'gh auth login' again, or re-sign-in with the Copilot CLI (or the JetBrains/Neovim plugin).";
     private const string ForbiddenMessage =
-        "Access to Copilot quota was denied. The stored token may be stale - sign in again with the Copilot CLI or JetBrains plugin.";
+        "Access to Copilot quota was denied. The stored token may be stale - run 'gh auth login' again or re-sign-in with the Copilot CLI.";
     private const string RateLimitedMessage =
         "GitHub API rate limit reached. Quota will refresh automatically later.";
     private const string UnavailableMessage =

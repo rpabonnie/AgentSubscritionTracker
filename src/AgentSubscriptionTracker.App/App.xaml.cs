@@ -66,7 +66,13 @@ internal sealed partial class App : Application, IDisposable
         _trayIcon = new TrayIconHost(iconPath);
         _trayIcon.ThemeSettingChanged += (_, _) => ThemeDetector.ApplyTheme(this);
         _trayIcon.ContextMenuRequested += (_, _) => ShowContextMenu();
-        _callout = new CalloutController(_trayIcon, new CalloutWindow(_viewModel), _viewModel);
+
+        // The callout's command row is the primary way to operate the app (SPEC-0003 §5.2
+        // amendment); the tray context menu stays as a secondary affordance.
+        var calloutWindow = new CalloutWindow(_viewModel);
+        calloutWindow.RefreshRequested += (_, _) => _ = _viewModel.RequestRefreshAsync(RefreshTrigger.Manual);
+        calloutWindow.ExitRequested += (_, _) => ExitApplication();
+        _callout = new CalloutController(_trayIcon, calloutWindow, _viewModel);
 
         // Secondary launches signal this event; open the callout dispatcher-marshalled.
         _showCalloutSignal = new EventWaitHandle(false, EventResetMode.AutoReset, ShowCalloutEventName);
@@ -134,17 +140,19 @@ internal sealed partial class App : Application, IDisposable
         // (SPEC-0003 §5.5 marks it optional for v1).
 
         var exitItem = new MenuItem { Header = "Exit" };
-        exitItem.Click += (_, _) =>
-        {
-            _callout.Dispose();
-            _trayIcon.Dispose();
-            Shutdown();
-        };
+        exitItem.Click += (_, _) => ExitApplication();
 
         var menu = new ContextMenu { Placement = PlacementMode.MousePoint };
         menu.Items.Add(refreshItem);
         menu.Items.Add(new Separator());
         menu.Items.Add(exitItem);
         menu.IsOpen = true;
+    }
+
+    private void ExitApplication()
+    {
+        _callout?.Dispose();
+        _trayIcon?.Dispose();
+        Shutdown();
     }
 }

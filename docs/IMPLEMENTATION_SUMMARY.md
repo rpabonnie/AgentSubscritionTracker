@@ -119,4 +119,36 @@ TASK-007/TASK-008:
 
 - TASK-011 human checkpoint: verify hover callout, positioning, themes, Explorer-restart
   re-add, and live provider data on a signed-in machine.
+  → **Failed 2026-06-11**; findings fixed in the TASK-012 phase below.
 - "Start with Windows" context-menu toggle deferred (spec-optional for v1, code TODO in App.xaml.cs).
+
+## Phase: TASK-012/013 — TASK-011 acceptance fixes + auth-config analysis (2026-06-11)
+
+Human acceptance found Claude falsely "unavailable", Copilot falsely "not signed in", and no
+way to operate the app from the callout. Diagnosis was verified live (see ADR-0003 and
+memory.md 21:40 entry).
+
+### Delivered
+
+| Change | Files |
+|---|---|
+| **Budget semantics fix** (SPEC-0003 §4.4 amendment): the 2 s per-provider budget no longer cancels in-flight fetches; on elapse the refresh pass returns (previous presentation kept) and the fetch publishes itself on completion. Fixes the expired-token OAuth-refresh path that produced a sticky false "Unavailable". | `ViewModels/TrayViewModel.cs` |
+| **gh CLI token discovery** (SPEC-0002 §3 steps 6–7): Credential Manager `gh:github.com:` keyring entry (verified: raw gh OAuth token, accepted by `copilot_internal/user` with HTTP 200) and `%APPDATA%\GitHub CLI\hosts.yml` line-scan fallback. New `CopilotTokenSource.GhCliCredentialManager/GhCliHostsFile`, `CopilotTokenProviderOptions.RoamingAppDataPath`. | `Services/CopilotTokenProvider.cs`, `Services/CopilotQuotaContracts.cs` |
+| **Callout command row** (SPEC-0003 §5.2 amendment): footer Refresh (manual refresh) + Exit (clean shutdown) buttons; the overlay alone operates the app, the tray context menu stays as a secondary affordance. | `Views/CalloutWindow.xaml(.cs)`, `App.xaml.cs` |
+| Sign-in guidance now names `gh auth login` in the Copilot failure messages. | `Services/CopilotQuotaService.cs` |
+| **ADR-0003**: no token-entry settings page (PATs are rejected by `copilot_internal`; Claude usage is OAuth-only) — zero-config discovery + actionable messages instead; device-flow OAuth deferred. | `docs/adr/ADR-0003-Auth-Configuration-Strategy.md`, `docs/COPILOT_SETUP.md` |
+
+### Verification
+
+- `dotnet build` — 0 warnings; `dotnet test` — **158/158 passed** (6 new: 4 gh-discovery,
+  2 budget-semantics regression tests).
+- Live probe on the failing machine: gh keyring token == `gh auth token`; `copilot_internal/user`
+  → HTTP 200, `individual_pro`, full `quota_snapshots`.
+- Smoke test: app launches, second instance forces the callout open (triggering a live
+  refresh incl. the real Claude OAuth refresh path) and the app stays running.
+
+### Open items
+
+- TASK-014 human re-acceptance: hover the tray icon — Claude data may take a few seconds on
+  the first open (token refresh) and should appear while the callout is open; Copilot should
+  show quota via the gh token; Refresh/Exit buttons in the callout footer.
