@@ -29,6 +29,22 @@ public sealed class CopilotTokenProviderTests : IDisposable
         });
 
     [Fact]
+    public void CopilotTokenToStringNeverContainsTheTokenValue()
+    {
+        // Arrange — CLAUDE.md Security Standards: redact every *token* field in all
+        // diagnostic output. The record's ToString must never echo the raw value.
+        var token = new CopilotToken("fake-token-for-tests-redaction", CopilotTokenSource.CredentialManager);
+
+        // Act
+        var text = token.ToString();
+
+        // Assert
+        Assert.DoesNotContain("fake-token-for-tests-redaction", text, StringComparison.Ordinal);
+        Assert.Contains("[REDACTED]", text, StringComparison.Ordinal);
+        Assert.Contains(nameof(CopilotTokenSource.CredentialManager), text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CredentialManagerServiceCopilotCliTakesPrecedenceOverFiles()
     {
         // Arrange — credential present AND files present; the store must win.

@@ -42,7 +42,12 @@ public enum CopilotTokenSource
 }
 
 /// <summary>A discovered Copilot OAuth token and its source.</summary>
-public sealed record CopilotToken(string Value, CopilotTokenSource Source);
+public sealed record CopilotToken(string Value, CopilotTokenSource Source)
+{
+    /// <summary>Redacted: never contains the token value (CLAUDE.md Security Standards).</summary>
+    public override string ToString() =>
+        $"CopilotToken {{ Value = [REDACTED], Source = {Source} }}";
+}
 
 /// <summary>Discovers a Copilot token from local credential stores/files.</summary>
 public interface ICopilotTokenProvider

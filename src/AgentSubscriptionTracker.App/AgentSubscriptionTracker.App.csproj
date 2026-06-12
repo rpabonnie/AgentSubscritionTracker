@@ -3,6 +3,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
+    <Version>0.1.0-alpha</Version>
     <RootNamespace>AgentSubscriptionTracker.App</RootNamespace>
     <AssemblyName>AgentSubscriptionTracker.App</AssemblyName>
     <UseWPF>true</UseWPF>

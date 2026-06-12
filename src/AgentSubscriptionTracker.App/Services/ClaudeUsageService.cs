@@ -19,6 +19,12 @@ public sealed class ClaudeUsageService : IClaudeUsageService, IDisposable
     private const string AnthropicBetaHeaderName = "anthropic-beta";
     private const string AnthropicBetaHeaderValue = "oauth-2025-04-20";
 
+    /// <summary>Usage calls may only target api.anthropic.com (CLAUDE.md network allowlist).</summary>
+    private const string AllowedUsageHost = "api.anthropic.com";
+
+    /// <summary>The refresh grant (which carries the refresh token) may only target these hosts (ADR-0002).</summary>
+    private static readonly string[] AllowedRefreshHosts = ["platform.claude.com", "console.anthropic.com"];
+
     /// <summary>Responses are untrusted input; bound the payload read to 1 MiB.</summary>
     private const int MaxResponseChars = 1024 * 1024;
 
@@ -49,10 +55,40 @@ public sealed class ClaudeUsageService : IClaudeUsageService, IDisposable
         _credentialsReader = credentialsReader;
         _timeProvider = timeProvider;
         _options = options ?? new ClaudeUsageServiceOptions();
+        ValidateEndpointAllowlist(_options);
         _httpClient = new HttpClient(httpMessageHandler, disposeHandler: false)
         {
             Timeout = _options.HttpTimeout,
         };
+    }
+
+    /// <summary>
+    /// Tokens are only ever sent to allowlisted HTTPS hosts; a misconfigured options object
+    /// must fail at construction, never silently exfiltrate (mirrors CopilotQuotaService).
+    /// </summary>
+    private static void ValidateEndpointAllowlist(ClaudeUsageServiceOptions options)
+    {
+        if (!IsAllowed(options.UsageEndpoint, AllowedUsageHost))
+        {
+            throw new ArgumentException(
+                $"UsageEndpoint must be an https URI on {AllowedUsageHost} (allowlisted host).",
+                nameof(options));
+        }
+
+        foreach (var endpoint in options.TokenRefreshEndpoints)
+        {
+            if (!AllowedRefreshHosts.Any(host => IsAllowed(endpoint, host)))
+            {
+                throw new ArgumentException(
+                    $"TokenRefreshEndpoints must be https URIs on {string.Join(" or ", AllowedRefreshHosts)} (ADR-0002).",
+                    nameof(options));
+            }
+        }
+
+        static bool IsAllowed(Uri endpoint, string host) =>
+            endpoint.IsAbsoluteUri &&
+            Uri.UriSchemeHttps.Equals(endpoint.Scheme, StringComparison.OrdinalIgnoreCase) &&
+            host.Equals(endpoint.Host, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <inheritdoc />

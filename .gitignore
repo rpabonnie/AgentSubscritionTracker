@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# Local release packaging output (installer/build-release.ps1)
+artifacts/
+
 # User-specific files
 *.rsuser
 *.suo

@@ -232,4 +232,72 @@ public sealed class ClaudeUsageServiceTests
         Assert.Equal(2, reader.ReadCount);
         Assert.Equal(2, handler.Requests.Count);
     }
+
+    [Fact]
+    public void Constructor_RejectsNonAllowlistedUsageEndpoint()
+    {
+        // Arrange — CLAUDE.md allowlist: usage calls only to api.anthropic.com.
+        var handler = new FakeHttpMessageHandler();
+        var time = new TestTimeProvider(ClaudeTestData.TestNow);
+        var reader = new FakeClaudeCredentialsReader(ClaudeTestData.ValidCredentials());
+        var options = ClaudeTestData.FastOptions() with
+        {
+            UsageEndpoint = new Uri("https://evil.example.com/api/oauth/usage"),
+        };
+
+        // Act + Assert
+        Assert.Throws<ArgumentException>(() =>
+            new ClaudeUsageService(reader, handler, time, options));
+    }
+
+    [Fact]
+    public void Constructor_RejectsHttpUsageEndpoint()
+    {
+        // Arrange — HTTPS only, even on the allowlisted host.
+        var handler = new FakeHttpMessageHandler();
+        var time = new TestTimeProvider(ClaudeTestData.TestNow);
+        var reader = new FakeClaudeCredentialsReader(ClaudeTestData.ValidCredentials());
+        var options = ClaudeTestData.FastOptions() with
+        {
+            UsageEndpoint = new Uri("http://api.anthropic.com/api/oauth/usage"),
+        };
+
+        // Act + Assert
+        Assert.Throws<ArgumentException>(() =>
+            new ClaudeUsageService(reader, handler, time, options));
+    }
+
+    [Fact]
+    public void Constructor_RejectsNonAllowlistedRefreshEndpoint()
+    {
+        // Arrange — ADR-0002: the refresh grant (carrying the refresh token) may only
+        // target platform.claude.com / console.anthropic.com.
+        var handler = new FakeHttpMessageHandler();
+        var time = new TestTimeProvider(ClaudeTestData.TestNow);
+        var reader = new FakeClaudeCredentialsReader(ClaudeTestData.ValidCredentials());
+        var options = ClaudeTestData.FastOptions() with
+        {
+            TokenRefreshEndpoints =
+            [
+                new Uri("https://platform.claude.com/v1/oauth/token"),
+                new Uri("https://attacker.example.com/v1/oauth/token"),
+            ],
+        };
+
+        // Act + Assert
+        Assert.Throws<ArgumentException>(() =>
+            new ClaudeUsageService(reader, handler, time, options));
+    }
+
+    [Fact]
+    public void Constructor_AcceptsDefaultAllowlistedEndpoints()
+    {
+        // Arrange
+        var handler = new FakeHttpMessageHandler();
+        var time = new TestTimeProvider(ClaudeTestData.TestNow);
+        var reader = new FakeClaudeCredentialsReader(ClaudeTestData.ValidCredentials());
+
+        // Act + Assert — defaults construct without throwing.
+        using var service = new ClaudeUsageService(reader, handler, time, new ClaudeUsageServiceOptions());
+    }
 }
