@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1-alpha] - 2026-06-12
+
+### Fixed
+- The hover callout no longer disappears while moving the mouse from the tray icon up to its Refresh/Exit buttons: the shell's immediate popup-close signal is ignored in favor of the pointer-watch grace period, and that grace period was extended from ~300 ms to ~800 ms.
+
 ## [0.1.0-alpha] - 2026-06-12
 
 ### Added
