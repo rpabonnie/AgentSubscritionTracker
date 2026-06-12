@@ -9,6 +9,8 @@ Hover the tray icon and a callout pops up with usage bars for:
 
 Bars turn amber at 75 % used and red at 90 %, the footer shows how fresh the data is, and countdowns tell you when each limit resets (computed in UTC, shown in your local time).
 
+![Agent Subscription Tracker callout](docs/images/AgentSubscriptionTracker.png)
+
 ## How it works
 
 The app does **not** ask you for any credentials and never opens a sign-in page of its own. Instead, it reuses the sign-ins you already have on your machine:
