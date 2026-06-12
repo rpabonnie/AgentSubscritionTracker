@@ -13,12 +13,13 @@ namespace AgentSubscriptionTracker.App.Tray;
 
 /// <summary>
 /// Shows the callout on hover (cached data instantly, background hover refresh), hides it
-/// when the pointer has left both the icon and the callout for a ~300 ms grace period, and
-/// positions it adjacent to the icon clamped to the monitor's working area.
+/// when the pointer has left both the icon and the callout for a ~800 ms grace period
+/// (long enough to travel from the icon to the callout's buttons), and positions it
+/// adjacent to the icon clamped to the monitor's working area.
 /// </summary>
 public sealed partial class CalloutController : IDisposable
 {
-    private const int GraceTicks = 3; // 3 × 100 ms pointer-watch ticks ≈ 300 ms grace.
+    private const int GraceTicks = 8; // 8 × 100 ms pointer-watch ticks ≈ 800 ms grace.
 
     private readonly TrayIconHost _trayIcon;
     private readonly CalloutWindow _window;
@@ -41,7 +42,12 @@ public sealed partial class CalloutController : IDisposable
         _pointerWatch.Tick += (_, _) => OnPointerWatchTick();
 
         _trayIcon.CalloutRequested += (_, _) => Show();
-        _trayIcon.CalloutDismissRequested += (_, _) => HideUnlessPointerInside();
+
+        // CalloutDismissRequested (NIN_POPUPCLOSE) is deliberately not handled: it fires
+        // the moment the pointer leaves the icon — including while it is still in transit
+        // toward the callout's buttons, when it is briefly inside neither the icon rect
+        // nor the window. Hiding on it closes the callout before the user can reach it;
+        // dismissal is left entirely to the pointer watch's grace period.
         _trayIcon.IconClicked += (_, _) => Toggle();
         _window.SizeChanged += (_, _) =>
         {
@@ -101,19 +107,6 @@ public sealed partial class CalloutController : IDisposable
         _disposed = true;
         _pointerWatch.Stop();
         _window.Close();
-    }
-
-    private void HideUnlessPointerInside()
-    {
-        if (!_window.IsVisible || !NativeMethods.GetCursorPos(out var cursor))
-        {
-            return;
-        }
-
-        if (!IsInsideWindowDevice(cursor.X, cursor.Y))
-        {
-            Hide();
-        }
     }
 
     private void OnPointerWatchTick()
