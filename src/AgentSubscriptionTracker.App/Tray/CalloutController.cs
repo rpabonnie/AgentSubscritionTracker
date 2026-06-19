@@ -27,6 +27,7 @@ public sealed partial class CalloutController : IDisposable
     private readonly DispatcherTimer _pointerWatch;
     private int _outsideTicks;
     private bool _disposed;
+    private int _autoHideSuspendCount;
 
     public CalloutController(TrayIconHost trayIcon, CalloutWindow window, TrayViewModel viewModel)
     {
@@ -109,8 +110,30 @@ public sealed partial class CalloutController : IDisposable
         _window.Close();
     }
 
+    /// <summary>Suspends the hide-on-blur/auto-hide pointer watch (SPEC-0004 §4.4 edge case
+    /// #16 — the theme editor pins this while open so opening it never closes the live
+    /// callout underneath it). Nestable; the watch resumes only once every suspension is
+    /// matched by <see cref="ResumeAutoHide"/>.</summary>
+    public void SuspendAutoHide() => _autoHideSuspendCount++;
+
+    /// <summary>Resumes the auto-hide pointer watch once every <see cref="SuspendAutoHide"/>
+    /// call has a matching resume.</summary>
+    public void ResumeAutoHide()
+    {
+        if (_autoHideSuspendCount > 0)
+        {
+            _autoHideSuspendCount--;
+        }
+    }
+
     private void OnPointerWatchTick()
     {
+        if (_autoHideSuspendCount > 0)
+        {
+            _outsideTicks = 0;
+            return;
+        }
+
         if (!_window.IsVisible)
         {
             _pointerWatch.Stop();

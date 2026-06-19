@@ -10,6 +10,12 @@
     <SolidColorBrush x:Key="WarningBrush" Color="#FFE0A53C" />
     <SolidColorBrush x:Key="CriticalBrush" Color="#FFE5534B" />
     <SolidColorBrush x:Key="BarTrackBrush" Color="#FF343B4D" />
+
+    <!-- SPEC-0004 §5.3 — severity-band keys consumed by SeverityToBrushConverter,
+         resolved from the active theme's resources instead of static converter colors. -->
+    <SolidColorBrush x:Key="ok" Color="#FF6E8BFF" />
+    <SolidColorBrush x:Key="warn" Color="#FFE0A53C" />
+    <SolidColorBrush x:Key="critical" Color="#FFE5534B" />
     <SolidColorBrush x:Key="SeparatorBrush" Color="#FF2B3242" />
 
 </ResourceDictionary>
