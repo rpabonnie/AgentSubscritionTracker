@@ -20,4 +20,11 @@
     <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- SPEC-0004 — the 2 built-in theme manifests, embedded so ThemeLoader can re-seed
+         them from the assembly even if the on-disk themes folder is missing/corrupt. -->
+    <EmbeddedResource Include="Assets\Themes\light.theme.json" LogicalName="AgentSubscriptionTracker.App.Assets.Themes.light.theme.json" />
+    <EmbeddedResource Include="Assets\Themes\dark.theme.json" LogicalName="AgentSubscriptionTracker.App.Assets.Themes.dark.theme.json" />
+  </ItemGroup>
+
 </Project>

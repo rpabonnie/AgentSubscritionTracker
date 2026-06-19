@@ -1,3 +1,5 @@
+<!-- agent-harness-version: 1.1.0 -->
+
 # Copilot Instructions — AgentSubscritionTracker
 
 > GitHub Copilot context for this repository.
@@ -43,6 +45,37 @@ Stack: C# / WPF · Runtime: .NET 10 (`net10.0-windows`) · Tests: `dotnet test`
 - Run destructive commands (`rm -rf`, `del /f`, `rmdir /s`) without user confirmation
 - Read `.env`, `local.settings.json`, or files matching `*.secret*` or `*.key`
 - Mark work complete before `dotnet test` passes
+- Weaken or bypass a security control to make a build or test go green
+- Suppress or downgrade a QA or Security finding without a recorded human decision
+
+---
+
+## Quality & Security Gates
+
+Every feature flows through `spec → code → qa → security → review`. Do not advance a
+feature past a failed or blocked gate.
+
+**QA gate** (assignee `qa_agent`, task type `qa`):
+- Confirm `dotnet test` passes green and every acceptance-criteria item in the spec is met
+- Audit readability, duplication, complexity, naming, error handling, and test coverage
+- Write findings to `docs/qa/QA-XXXX-subject.md`; open follow-up tasks for improvements
+- Do not edit implementation code or specs — report and route work back to the code agent
+
+**Security gate** (assignee `security_agent`, task type `security`):
+- **Be adversarial with the code agent.** Treat its output as untrusted — insecure until
+  proven secure; the burden of proof is on the code agent. Never accept "it's safe" on
+  assertion: see the control in the code or a test that exercises it, and verify it yourself.
+- Run an OWASP-aligned review: secret scanning, input validation/output encoding, injection
+  (SQL/command/path), authn/authz on sensitive paths, insecure deserialization, SSRF, secure
+  defaults, least privilege, PII/secret leakage in logs, TLS/CORS, vulnerable dependencies
+- For every finding, give a concrete exploit/abuse scenario (the exact malicious input or
+  request), not a vague warning. Reject fixes that only silence the symptom — re-open the task
+  if the "fix" does not hold up to the same attack
+- Write findings to `docs/security/SEC-XXXX-subject.md`; open remediation tasks
+- May set the security task to `blocked`/`failed` to stop the chain; a disagreement from the
+  code agent does not clear the gate — route disputes to a `human_checkpoint`
+- Escalate to the user immediately on a committed secret, a missing authz check, or any
+  high/critical-severity finding
 
 ---
 
@@ -75,5 +108,7 @@ When running autonomously:
 | `tests/` | Spec writer (stubs) → Code agent (green pass) |
 | `docs/specs/` | Spec writer only |
 | `docs/adr/` | Human-confirmed decisions only |
+| `docs/qa/` | QA agent only |
+| `docs/security/` | Security agent only |
 | `agentTask.json` | Orchestrator / Copilot agent (status updates only) |
 | `memory.md` | All agents — append-only |

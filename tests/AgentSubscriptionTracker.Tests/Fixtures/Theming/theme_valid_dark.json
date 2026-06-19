@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "name": "Dark",
+  "background": {
+    "imagePath": "background.png",
+    "fallbackColor": "#FF1F2430"
+  },
+  "fonts": {
+    "header": { "family": "Segoe UI", "size": 13.0, "weight": "SemiBold" },
+    "body": { "family": "Segoe UI", "size": 12.0, "weight": "Normal" },
+    "footer": { "family": "Segoe UI", "size": 10.5, "weight": "Normal" }
+  },
+  "brushes": {
+    "CalloutBackgroundBrush": "#FF1F2430",
+    "CalloutBorderBrush": "#FF3A3F4B",
+    "TextPrimaryBrush": "#FFF5F5F5",
+    "TextSecondaryBrush": "#FFB7BCC7",
+    "BarTrackBrush": "#FF2C313D",
+    "SeparatorBrush": "#FF3A3F4B",
+    "AccentBrush": "#FF4C8DFF"
+  },
+  "severityBands": {
+    "ok": "#FF35C46B",
+    "warn": "#FFE0A22B",
+    "critical": "#FFE05C5C"
+  }
+}

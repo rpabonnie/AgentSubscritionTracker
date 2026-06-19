@@ -4,6 +4,12 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <IsPackable>false</IsPackable>
+    <!-- Test code is not shipped/externally-visible product surface; CAxxxx analyzer
+         rules tuned for public API hygiene (CA1054 Uri params, CA1062 null-checks on
+         theory data, CA1307/CA1308 culture-explicit string ops) add noise without value
+         in xUnit [Theory]/test-only helper methods. Keep TreatWarningsAsErrors for genuine
+         compiler warnings; only relax the design/globalization analyzer categories here. -->
+    <NoWarn>$(NoWarn);CA1031;CA1054;CA1062;CA1307;CA1308;CA1859</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,6 +33,8 @@
   <ItemGroup>
     <!-- Golden-file JSON fixtures (fake tokens only) used by SPEC test stubs. -->
     <None Update="Fixtures\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- SPEC-0004 background-image fixtures (synthetic PNGs, no real user content). -->
+    <None Update="Fixtures\**\*.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

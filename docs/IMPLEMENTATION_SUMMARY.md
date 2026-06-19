@@ -152,3 +152,163 @@ memory.md 21:40 entry).
 - TASK-014 human re-acceptance: hover the tray icon — Claude data may take a few seconds on
   the first open (token refresh) and should appear while the callout is open; Copilot should
   show quota via the gh token; Refresh/Exit buttons in the callout footer.
+  → **Approved 2026-06-19**.
+
+## Phase: TASK-016 — SPEC-0004 callout theming engine (2026-06-19)
+
+### Delivered
+
+| File | Contents |
+|---|---|
+| `src/AgentSubscriptionTracker.App/Theming/ThemeManifest.cs` | `ThemeManifest`, `ThemeBackground`, `ThemeFontSet`, `ThemeFont`, `ThemeBrushSet`, `ThemeSeverityBands` records |
+| `src/AgentSubscriptionTracker.App/Theming/ThemeManifestSerializer.cs` | `IThemeManifestSerializer`/`ThemeManifestSerializer` — strict, bounded `System.Text.Json` parse/serialize; whole-file quarantine on malformed JSON/missing field/invalid color/out-of-range size/unsupported schema version/path-traversal `imagePath` |
+| `src/AgentSubscriptionTracker.App/Theming/ThemePathResolver.cs` | static `imagePath` containment helper (`TryResolveContained`, syntax-only `IsSyntacticallySafe`) — rejects `..`, absolute paths, UNC, URI schemes |
+| `src/AgentSubscriptionTracker.App/Theming/ThemeBackgroundImageValidator.cs` | `IThemeBackgroundImageValidator`/`ThemeBackgroundImageValidator` — containment → exists → size (≤2 MB) → PNG signature → structural IEND-completeness + full pixel-buffer decode → dimensions (≤1024×1536) → real-alpha `PixelFormat` check, in that short-circuiting order |
+| `src/AgentSubscriptionTracker.App/Theming/ThemeFontResolver.cs` | `IThemeFontResolver`/`ThemeFontResolver` — `SystemFontFamilies` lookup with Segoe UI fallback; weight-string mapping defaulting to `FontWeights.Normal` |
+| `src/AgentSubscriptionTracker.App/Theming/ThemeLoader.cs` | `IThemeLoader`/`ThemeLoader` — discovery, built-in re-seed from embedded resources, duplicate-id quarantine (slug-collision detection), degrade-vs-quarantine policy, absolute in-code fallback pair |
+| `src/AgentSubscriptionTracker.App/Theming/ThemeStore.cs` | `IThemeStore`/`ThemeStore` — Save-As (unique-slug fork), in-place `Overwrite` (throws for built-ins), `Delete` |
+| `src/AgentSubscriptionTracker.App/Views/CalloutWindow.xaml(.cs)` (modified) | `SeverityToBrushConverter` now resolves `ok`/`warn`/`critical`/`BarTrackBrush` from the bound element's resource scope (`IValueConverter` + `IMultiValueConverter`) instead of static converter-owned colors; new `BarTrackBrushMultiConverter`; progress bar binds via `MultiBinding`+`RelativeSource Self` so the converter can resolve from its own scope |
+| `src/AgentSubscriptionTracker.App/Themes/Dark.xaml`, `Light.xaml` (modified) | added `ok`/`warn`/`critical` resource keys consumed by the modified converter |
+| `src/AgentSubscriptionTracker.App/Assets/Themes/light.theme.json`, `dark.theme.json` | embedded built-in manifests (`EmbeddedResource`, no background image) |
+
+### Deferred to TASK-017/018/019 (shell-level, no unit test stub exists)
+
+Per SPEC-0004 §5/§7, the theme button, `ThemePickerPopup`, `ThemeEditorWindow`,
+`ThemePickerViewModel`, and `ThemeEditorViewModel` are shell/UI surface — "no window is
+ever shown" by the SPEC-0004 test stubs, consistent with how SPEC-0003 treats
+`TrayIconHost`/`CalloutController`/`CalloutWindow`. TASK-016 delivers the full theming
+*engine* (manifest model, parsing, image/font validation, loader, store, theme-aware
+severity/track-brush resolution) that those views will bind to; the views themselves are
+explicitly out of this task's automated-test surface and are called out as an open item
+for QA/security/review (TASK-017/018/019) to confirm before sign-off.
+
+### Notable implementation decisions beyond the literal spec text
+
+- **Duplicate-theme-id slug rule**: `ThemeLoaderTests` pins a folder-name-derived id that
+  must collide for two *different* folder names ("custom-1" vs.
+  "custom-1-duplicate-marker"). Implemented as: lowercase the folder name, and if it
+  matches `^[a-z0-9]+(-[a-z0-9]+)*?-\d+`, truncate to that match; otherwise use the full
+  lowercased folder name unchanged. Ordinary folder names (no numeric suffix) are
+  unaffected.
+- **Missing background file vs. corrupt background file**: a manifest referencing a
+  `background.png` that was never written, or one that *was* present but is now
+  corrupt/moved/deleted, both load as `DegradedMissingOrInvalidImage` (FallbackColor
+  only) per SPEC-0004 §4.4 row 4 — `BackgroundImageValidationError.FileNotFound` maps to
+  the same degraded status as every other validation error (corrupt, oversized, no-alpha,
+  wrong format, path-escape). An earlier revision of `ThemeLoader` special-cased
+  `FileNotFound` to `Ok`/no-image instead; TASK-021 (QA-0004 follow-up) corrected this and
+  added `ThemeLoaderTests.LoadAll_BackgroundImageMissingFromDisk_DegradesTheme_DoesNotQuarantineIt`
+  to pin the literal missing-file scenario, distinct from the existing
+  corrupt/truncated-PNG degrade test.
+- **Truncated-PNG detection**: WPF's `PngBitmapDecoder` silently zero-fills missing
+  scanlines for a mid-stream-truncated file rather than throwing, even after a forced
+  `CopyPixels`. Added a structural check (file's last 8 bytes must be the canonical
+  zero-length `IEND` chunk type+CRC) before decode, which reliably catches the
+  `truncated.png` fixture while leaving well-formed PNGs (including the oversized-file-size
+  fixture, which fails the earlier size check before ever reaching this one) unaffected.
+- **`ThemeManifest.Fonts.Size` round-trip of `NaN`**: one out-of-range test serializes a
+  manifest containing `double.NaN` and re-parses it. `System.Text.Json` cannot write raw
+  JSON `NaN`; `FontDto.Size` opts into
+  `JsonNumberHandling.AllowNamedFloatingPointLiterals` (writes the JSON string `"NaN"`),
+  and the manual `JsonDocument`-based parser accepts that one string shape for `size`
+  before applying the same `OutOfRangeValue` rule used for in-range numeric values.
+
+### Test/build infrastructure changes
+
+- `tests/AgentSubscriptionTracker.Tests.csproj`: added
+  `NoWarn>CA1031;CA1054;CA1062;CA1307;CA1308;CA1859` — these design/globalization analyzer
+  rules fire on `[Theory]` test methods and test-only factory helpers (public-API-shaped
+  rules with no product-code value inside the test assembly); `TreatWarningsAsErrors`
+  stays on for genuine compiler diagnostics.
+- `tests/AgentSubscriptionTracker.Tests/Theming/ThemeTestSupport.cs`: added
+  `RunOnSta(Action)` — WPF `FrameworkElement` construction requires an STA thread; xUnit's
+  default test thread is MTA. `SeverityToBrushConverterThemeTests` wrap their bodies in
+  `RunOnSta` rather than constructing a `FrameworkElement` directly on the test thread.
+- Filled in the `CreateSerializer`/`CreateValidator`/`CreateResolver`/`CreateLoader`
+  `NotImplementedException` factory stubs in each `*Tests.cs` file to return the new
+  concrete implementations — the only edits made to spec-writer's test files; no
+  assertions were changed.
+- `src/AgentSubscriptionTracker.App.csproj`: added `EmbeddedResource` entries for the two
+  built-in `*.theme.json` assets (logical names under
+  `AgentSubscriptionTracker.App.Assets.Themes.*`).
+
+### Verification
+
+- `dotnet build` — 0 warnings, 0 errors (TreatWarningsAsErrors, AnalysisMode=All), whole solution.
+- `dotnet test` — **225/225 passed** (73 new SPEC-0004 theming tests; zero regressions in
+  the existing 152 SPEC-0001/0002/0003 tests); no live network, no window shown.
+
+### Open items (as of TASK-016, superseded — see TASK-020/021 below)
+
+- `ThemePickerPopup`, `ThemeEditorWindow`, `ThemePickerViewModel`, `ThemeEditorViewModel`
+  (callout theme button, non-activating picker, live-preview editor) are not yet
+  implemented — SPEC-0004 §5/§8 explicitly scopes these to manual verification/code
+  review rather than automated test stubs. Recommend a follow-up task before TASK-019
+  review closes if the UI surface is required for this milestone, or an explicit
+  `human_checkpoint`/scope note if it is deferred past this phase.
+
+## Phase: TASK-020 — SPEC-0004 theme picker/editor shell (2026-06-19)
+
+### Delivered
+
+The shell/UI surface deferred above is now wired up end to end:
+
+- `App.xaml.cs` composition root: loads/re-seeds the theme repository and applies the
+  active theme at startup (`ApplyInitialTheme`), re-applies the OS-appropriate built-in on
+  `WM_SETTINGCHANGE` when the user has not made an explicit choice yet
+  (`ApplyOsThemeIfNoUserChoiceYet`), and owns the picker/editor wiring
+  (`OnThemeButtonClicked`, `OnThemeSelected`, `OnAddNewTheme`, `OpenEditor`/`OpenEditorAsNew`,
+  `ShowEditor`).
+- `CalloutContent.xaml`/`CalloutWindow` footer Theme button raises `ThemeRequested`,
+  opening a real `ThemePickerPopup` (non-activating, same `ShowActivated=False`/
+  `AllowsTransparency=True` family as `CalloutWindow`) backed by `ThemePickerViewModel`.
+- `ThemePickerPopup`/`ThemePickerViewModel`: active-theme-first-then-alphabetical
+  ordering, duplicate-display-name disambiguation, ellipsis truncation for long names,
+  Select/Edit per row, separated "Add new theme" entry.
+- `ThemeEditorWindow`/`ThemeEditorViewModel`: real (non-activating-suppressing) window
+  hosting the live `CalloutContent` preview bound to a `ResourceDictionary` scoped to the
+  preview element only; background image picker + Clear; font family dropdown restricted
+  to `SystemFontFamilies`; one color picker per brush key and per severity band;
+  non-blocking low-contrast warning; Save (validate → persist via `IThemeStore` → live-update
+  the running callout if the saved theme is active) / Cancel (zero disk writes).
+- 7 of the 9 SPEC-0004 §4.4 edge cases that were blocked pending this shell are now
+  implemented: #9 (source folder deleted mid-edit falls through to Save-As), #12
+  (duplicate display names disambiguated, never merged), #16 (editor pins/suppresses the
+  callout's hide-on-blur/auto-hide while open), #17 (idempotent resource-scope swap on
+  theme switch), #18 (low-contrast warning), #19 (long-name ellipsis + tooltip), #20
+  (invalid/oversized PNG at import time surfaces an inline `ImportError`, never corrupts
+  the on-disk theme or crashes the thumbnail renderer).
+- `ThemeStoreTests`: 16 direct unit tests covering `SaveAsNew`/`Overwrite`/`Delete`,
+  unique-slug generation, and the built-in-route-through-`SaveAsNew` rule.
+
+### Verification
+
+- `dotnet build`/`dotnet test` green, no regressions.
+
+## Phase: TASK-021 — QA-0004 follow-up (2026-06-19)
+
+Targeted fixes for the findings in `docs/qa/QA-0004-theming.md`'s second (failed) gate run:
+
+- **High**: `ThemeLoader.LoadOneFolder` now maps a missing/moved background image
+  (`BackgroundImageValidationError.FileNotFound`) to `ThemeLoadStatus.DegradedMissingOrInvalidImage`
+  per SPEC-0004 §4.4 row 4, instead of `Ok`. Added
+  `ThemeLoaderTests.LoadAll_BackgroundImageMissingFromDisk_DegradesTheme_DoesNotQuarantineIt`
+  to pin the literal missing-file scenario (distinct from the pre-existing
+  corrupt/truncated-PNG degrade test).
+- **Medium**: this document updated to close out TASK-020 instead of still listing the
+  picker/editor as a future open item (see the TASK-020/TASK-021 sections above).
+- **Medium**: SPEC-0004 §4.4 edge case #11 (refuse deleting the active theme, with a
+  message) now has a real UI affordance — `ThemePickerPopup` gained a per-row Delete
+  button; `ThemePickerViewModel.TryDelete` refuses (no disk write, message returned) for
+  the active theme and for built-ins, otherwise calls `IThemeStore.Delete` and the shell
+  (`App.xaml.cs`) re-opens the picker against a fresh `LoadAll` afterward.
+- **Low**: added `ThemePickerViewModelTests` (ordering, disambiguation, truncation, delete
+  refusal rules) and `ThemeEditorViewModelTests` (Save routing to `SaveAsNew` vs.
+  `Overwrite`, low-contrast computation, background-image import validation) as direct
+  unit coverage of view-model logic that was previously only exercised indirectly via the
+  engine layer.
+
+### Verification
+
+- `dotnet build`/`dotnet test` green, no regressions (see test run recorded in `memory.md`'s
+  TASK-021 entry for the exact pass count).

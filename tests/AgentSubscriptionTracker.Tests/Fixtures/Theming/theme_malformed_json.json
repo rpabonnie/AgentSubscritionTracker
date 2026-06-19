@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "name": "Broken",
+  "background": { "imagePath": "background.png", "fallbackColor": "#FF1F2430" },
+  "fonts": { "header": { "family": "Segoe UI", "size": 13.0, "weight": "SemiBold" }
