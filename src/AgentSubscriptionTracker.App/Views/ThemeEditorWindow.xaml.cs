@@ -23,6 +23,7 @@ public sealed partial class ThemeEditorWindow : Window
     private readonly IThemeFontResolver _fontResolver;
     private readonly CalloutController? _liveCallout;
     private bool _suppressFieldEvents;
+    private bool _chromeReady;
 
     public ThemeEditorWindow(ThemeEditorViewModel viewModel, IThemeFontResolver fontResolver, CalloutController? liveCallout)
     {
@@ -45,6 +46,31 @@ public sealed partial class ThemeEditorWindow : Window
 
         Loaded += (_, _) => _liveCallout?.SuspendAutoHide();
         Closed += (_, _) => _liveCallout?.ResumeAutoHide();
+
+        // Ignore the Dark RadioButton's construction-time Checked event; the XAML-declared
+        // Dark default already loaded EditorChromeDark.xaml at index 0 of MergedDictionaries.
+        _chromeReady = true;
+    }
+
+    /// <summary>SPEC-0004 §5.2 — swaps the editor's OWN chrome dictionary (Editor* keys) on
+    /// the Light/Dark toggle. Never touches the preview path: the preview's CalloutContent
+    /// resolves its theme keys from its own scoped dictionary, so chrome swaps can't alter
+    /// it. The chrome dictionary is held at index 0 of <see cref="FrameworkElement.Resources"/>
+    /// MergedDictionaries and replaced wholesale.</summary>
+    private void OnEditorChromeChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_chromeReady)
+        {
+            return;
+        }
+
+        // App-root-absolute pack URI (leading slash) so it resolves regardless of this
+        // window's /Views/ base URI.
+        var path = LightChromeRadio.IsChecked == true
+            ? "/Themes/EditorChromeLight.xaml"
+            : "/Themes/EditorChromeDark.xaml";
+
+        Resources.MergedDictionaries[0] = new ResourceDictionary { Source = new Uri(path, UriKind.Relative) };
     }
 
     private static void PopulateFontCombo(System.Windows.Controls.ComboBox combo)
@@ -179,7 +205,10 @@ public sealed partial class ThemeEditorWindow : Window
         try
         {
             // Preview-scoped only (SPEC-0004 §5.2) — never Application.Current.Resources.
-            ThemeResourceApplier.Apply(PreviewContent.Resources, previewTheme, _fontResolver);
+            // Direct keyed writes raise a per-key invalidation that reliably re-resolves the
+            // DynamicResource consumers inside the preview's already-realized templates; a
+            // merged-dictionary swap here did not update them mid-edit.
+            ThemeResourceApplier.ApplyDirect(PreviewContent.Resources, previewTheme, _fontResolver);
         }
         catch (FormatException)
         {

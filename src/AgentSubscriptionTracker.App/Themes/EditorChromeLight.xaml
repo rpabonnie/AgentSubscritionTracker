@@ -1,0 +1,16 @@
+<!-- SPEC-0004 §5.2 — LIGHT editor-chrome brushes for the theme editor window itself (its own
+     window/labels/fields/buttons). Distinct key namespace (Editor*) so it never collides with
+     the edited-theme preview keys (CalloutBackgroundBrush, etc.). Must define the IDENTICAL key
+     set as EditorChromeDark.xaml so a swap never leaves an unresolved DynamicResource. -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <SolidColorBrush x:Key="EditorWindowBackground" Color="#FFF3F3F3" />
+    <SolidColorBrush x:Key="EditorPanelBackground" Color="#FFFAFAFA" />
+    <SolidColorBrush x:Key="EditorText" Color="#FF1B1F27" />
+    <SolidColorBrush x:Key="EditorFieldBackground" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="EditorFieldBorder" Color="#FFC8CCD4" />
+    <SolidColorBrush x:Key="EditorButtonBackground" Color="#FFE8E8E8" />
+    <SolidColorBrush x:Key="EditorButtonBorder" Color="#FFB8BCC4" />
+
+</ResourceDictionary>

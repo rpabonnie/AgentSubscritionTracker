@@ -135,12 +135,20 @@ internal sealed partial class App : Application, IDisposable
     {
         var state = _themeLoader!.LoadAll(_activeThemeId);
         var pickerViewModel = new ThemePickerViewModel(state, _themeStore);
-        var popup = new ThemePickerPopup(pickerViewModel);
+        var popup = new ThemePickerPopup(pickerViewModel, _fontResolver!);
         popup.ThemeSelected += (_, args) => OnThemeSelected(args.ThemeId);
         popup.EditThemeRequested += (_, args) => OpenEditor(args.Entry.Theme);
         popup.AddNewThemeRequested += (_, _) => OnAddNewTheme(state);
         popup.ThemeDeleted += (_, _) => OnThemeButtonClicked();
+
+        // Position beside the live callout, clamped to the callout's OWN monitor work area
+        // (not the primary monitor) so the popup follows the tray to a secondary display.
+        // Mirror CalloutController.Show()'s position/Show/reposition trick so the
+        // SizeToContent height is final on the second placement.
+        var workArea = _callout!.GetCalloutMonitorWorkArea();
+        popup.PositionNextTo(_calloutWindow, workArea);
         popup.Show();
+        popup.PositionNextTo(_calloutWindow, workArea);
     }
 
     private void OnThemeSelected(string themeId)

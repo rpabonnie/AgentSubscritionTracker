@@ -174,6 +174,41 @@ public sealed partial class CalloutController : IDisposable
         return x >= topLeft.X && x < bottomRight.X && y >= topLeft.Y && y < bottomRight.Y;
     }
 
+    /// <summary>SPEC-0004 §5.1 — the working area (in DIPs) of the monitor hosting the tray
+    /// icon / callout, so a secondary popup (the theme picker) can clamp itself to the SAME
+    /// monitor the callout is on, not the primary monitor's
+    /// <see cref="SystemParameters.WorkArea"/>. Falls back to the primary work area when the
+    /// icon rect or monitor info is unavailable.</summary>
+    public Rect GetCalloutMonitorWorkArea()
+    {
+        new WindowInteropHelper(_window).EnsureHandle();
+        var fromDevice = PresentationSource.FromVisual(_window) is { CompositionTarget: { } target }
+            ? target.TransformFromDevice
+            : Matrix.Identity;
+
+        if (_trayIcon.TryGetIconRect(out var icon))
+        {
+            var centerDevice = new NativeMethods.NativePoint
+            {
+                X = (icon.Left + icon.Right) / 2,
+                Y = (icon.Top + icon.Bottom) / 2,
+            };
+            var monitor = NativeMethods.MonitorFromPoint(centerDevice, 2 /* MONITOR_DEFAULTTONEAREST */);
+            var info = new NativeMethods.MonitorInfo
+            {
+                Size = (uint)Marshal.SizeOf<NativeMethods.MonitorInfo>(),
+            };
+            if (monitor != 0 && NativeMethods.GetMonitorInfo(monitor, ref info))
+            {
+                var topLeft = fromDevice.Transform(new Point(info.Work.Left, info.Work.Top));
+                var bottomRight = fromDevice.Transform(new Point(info.Work.Right, info.Work.Bottom));
+                return new Rect(topLeft, bottomRight);
+            }
+        }
+
+        return SystemParameters.WorkArea;
+    }
+
     private void PositionWindow()
     {
         new WindowInteropHelper(_window).EnsureHandle();

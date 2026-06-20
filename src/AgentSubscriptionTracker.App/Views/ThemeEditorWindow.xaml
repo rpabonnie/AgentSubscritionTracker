@@ -9,7 +9,22 @@
         Width="760"
         Height="560"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="CanResize">
+        ResizeMode="CanResize"
+        Background="{DynamicResource EditorWindowBackground}">
+
+    <!-- SPEC-0004 §5.2 — editor-chrome theming (the editor window's OWN look, NOT the theme
+         being edited). The chrome dictionary lives at index 0 of Window.Resources.Merged-
+         Dictionaries so the toggle handler can replace it; implicit chrome styles are scoped
+         to the left ScrollViewer below so they never reach the preview's CalloutContent. -->
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- App-root-absolute pack URI (leading slash). A relative "Themes/..." here
+                     resolves against this file's /Views/ base URI and throws at load. -->
+                <ResourceDictionary Source="/Themes/EditorChromeDark.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
 
     <Grid Margin="12">
         <Grid.ColumnDefinitions>
@@ -18,7 +33,52 @@
         </Grid.ColumnDefinitions>
 
         <ScrollViewer Grid.Column="0" Margin="0,0,12,0" VerticalScrollBarVisibility="Auto">
+            <!-- Chrome styles scoped here (not Window.Resources) so they re-theme only the
+                 editor's own controls, never the preview CalloutContent in the right column. -->
+            <ScrollViewer.Resources>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Foreground" Value="{DynamicResource EditorText}" />
+                </Style>
+                <Style TargetType="TextBox">
+                    <Setter Property="Foreground" Value="{DynamicResource EditorText}" />
+                    <Setter Property="Background" Value="{DynamicResource EditorFieldBackground}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource EditorFieldBorder}" />
+                    <Setter Property="CaretBrush" Value="{DynamicResource EditorText}" />
+                </Style>
+                <Style TargetType="ComboBox">
+                    <Setter Property="Foreground" Value="{DynamicResource EditorText}" />
+                    <Setter Property="Background" Value="{DynamicResource EditorFieldBackground}" />
+                </Style>
+                <Style TargetType="Button">
+                    <Setter Property="Foreground" Value="{DynamicResource EditorText}" />
+                    <Setter Property="Background" Value="{DynamicResource EditorButtonBackground}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource EditorButtonBorder}" />
+                </Style>
+                <Style TargetType="RadioButton">
+                    <Setter Property="Foreground" Value="{DynamicResource EditorText}" />
+                </Style>
+            </ScrollViewer.Resources>
             <StackPanel>
+                <!-- SPEC-0004 §5.2 — editor-chrome Light/Dark toggle. Re-themes the editor's own
+                     chrome only; the preview panel keeps rendering the edited theme. Dark is the
+                     default (matches the app's usual look). -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="Editor appearance" VerticalAlignment="Center" FontWeight="SemiBold" />
+                    <RadioButton x:Name="LightChromeRadio"
+                                 GroupName="EditorChrome"
+                                 Content="Light"
+                                 Margin="12,0,0,0"
+                                 VerticalAlignment="Center"
+                                 Checked="OnEditorChromeChanged" />
+                    <RadioButton x:Name="DarkChromeRadio"
+                                 GroupName="EditorChrome"
+                                 Content="Dark"
+                                 IsChecked="True"
+                                 Margin="10,0,0,0"
+                                 VerticalAlignment="Center"
+                                 Checked="OnEditorChromeChanged" />
+                </StackPanel>
+
                 <TextBlock FontWeight="SemiBold" Text="Name" />
                 <TextBox x:Name="NameBox" Margin="0,2,0,8" />
 
@@ -121,8 +181,8 @@
         </ScrollViewer>
 
         <Border Grid.Column="1"
-                Background="#FF202020"
-                BorderBrush="#FF3A3A3A"
+                Background="{DynamicResource EditorPanelBackground}"
+                BorderBrush="{DynamicResource EditorFieldBorder}"
                 BorderThickness="1"
                 CornerRadius="4">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,16,0,0">
