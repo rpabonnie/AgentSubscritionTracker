@@ -5,6 +5,7 @@
 // preview-scoped dictionary (never Application.Current.Resources) — same code path, two
 // different target dictionaries, per SPEC-0004 §5.2.
 
+using System.Collections;
 using System.Windows;
 using System.Windows.Media;
 using AgentSubscriptionTracker.App.Theming;
@@ -69,6 +70,28 @@ public static class ThemeResourceApplier
         target.MergedDictionaries.Add(built);
     }
 
+    /// <summary>SPEC-0004 §5.2 — preview-scoped direct-write path (versus the app-wide
+    /// merged <see cref="Apply"/>). Writes every built key straight onto
+    /// <paramref name="target"/> via the <see cref="ResourceDictionary"/> indexer instead of
+    /// through MergedDictionaries. A merged-dictionary Clear+Add swap does not reliably
+    /// re-resolve DynamicResource references already realized inside templates/styles (the
+    /// live preview would stop updating mid-edit); a direct keyed write raises a precise
+    /// per-key resource-changed notification, and the direct entry outranks any merged child
+    /// at this scope, so every consumer re-resolves. Used by the editor's live preview and
+    /// each theme-picker row's live preview; never <c>Application.Current.Resources</c>.</summary>
+    public static void ApplyDirect(ResourceDictionary target, LoadedTheme theme, IThemeFontResolver fontResolver)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        var built = BuildResourceDictionary(theme, fontResolver);
+        foreach (DictionaryEntry entry in built)
+        {
+            // Write every key, including the possibly-null CalloutBackgroundImage, so each
+            // raises a per-key DynamicResource invalidation at the preview scope.
+            target[entry.Key] = entry.Value;
+        }
+    }
+
     private static SolidColorBrush BrushFromHex(string hex)
     {
         try
@@ -82,8 +105,7 @@ public static class ThemeResourceApplier
         }
         catch (FormatException)
         {
-            // Manifests reaching this point are already strictly validated at parse time
-            // (§4.1); this is defense-in-depth only, never expected to trigger.
+            // Falls through to the neutral-gray fallback below.
         }
 
         return Brushes.Gray;
