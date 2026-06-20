@@ -8,6 +8,7 @@
     <SolidColorBrush x:Key="EditorWindowBackground" Color="#FF1E1E1E" />
     <SolidColorBrush x:Key="EditorPanelBackground" Color="#FF202020" />
     <SolidColorBrush x:Key="EditorText" Color="#FFEDEFF5" />
+    <SolidColorBrush x:Key="EditorSecondaryText" Color="#FF9AA3B5" />
     <SolidColorBrush x:Key="EditorFieldBackground" Color="#FF2A2A2A" />
     <SolidColorBrush x:Key="EditorFieldBorder" Color="#FF3A3A3A" />
     <SolidColorBrush x:Key="EditorButtonBackground" Color="#FF333333" />
