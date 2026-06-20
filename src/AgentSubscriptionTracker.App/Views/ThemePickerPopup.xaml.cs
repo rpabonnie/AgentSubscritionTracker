@@ -135,16 +135,13 @@ public sealed partial class ThemePickerPopup : Window
     {
         if (sender is Button { Tag: ThemeListEntryViewModel entry })
         {
+            // The shell (App) closes this popup and reopens a fresh one around the editor.
             EditThemeRequested?.Invoke(this, new ThemeEditRequestedEventArgs(entry));
-            Close();
         }
     }
 
-    private void OnAddNewThemeClick(object sender, RoutedEventArgs e)
-    {
+    private void OnAddNewThemeClick(object sender, RoutedEventArgs e) =>
         AddNewThemeRequested?.Invoke(this, EventArgs.Empty);
-        Close();
-    }
 
     /// <summary>Refuses (showing a message, popup stays open) for the active theme or a
     /// built-in (§4.4 edge case #11); otherwise deletes and closes so the shell can

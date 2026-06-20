@@ -36,6 +36,8 @@
             <!-- Chrome styles scoped here (not Window.Resources) so they re-theme only the
                  editor's own controls, never the preview CalloutContent in the right column. -->
             <ScrollViewer.Resources>
+                <views:HexToBrushConverter x:Key="HexToBrush" />
+
                 <Style TargetType="TextBlock">
                     <Setter Property="Foreground" Value="{DynamicResource EditorText}" />
                 </Style>
@@ -45,9 +47,103 @@
                     <Setter Property="BorderBrush" Value="{DynamicResource EditorFieldBorder}" />
                     <Setter Property="CaretBrush" Value="{DynamicResource EditorText}" />
                 </Style>
+
+                <!-- WPF's default ComboBox template doesn't reliably honor a plain Foreground
+                     setter on the selection box, so it reads as invisible on a dark field.
+                     A minimal explicit template guarantees readable text + dropdown in both modes. -->
+                <Style TargetType="ComboBoxItem">
+                    <Setter Property="Foreground" Value="{DynamicResource EditorText}" />
+                    <Setter Property="Background" Value="{DynamicResource EditorFieldBackground}" />
+                    <Setter Property="Padding" Value="6,3" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ComboBoxItem">
+                                <Border x:Name="ItemBorder"
+                                        Background="{TemplateBinding Background}"
+                                        Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsHighlighted" Value="True">
+                                        <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource EditorButtonBackground}" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
                 <Style TargetType="ComboBox">
                     <Setter Property="Foreground" Value="{DynamicResource EditorText}" />
                     <Setter Property="Background" Value="{DynamicResource EditorFieldBackground}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource EditorFieldBorder}" />
+                    <Setter Property="Height" Value="24" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ComboBox">
+                                <Grid>
+                                    <ToggleButton Focusable="False"
+                                                  ClickMode="Press"
+                                                  IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                        <ToggleButton.Template>
+                                            <ControlTemplate TargetType="ToggleButton">
+                                                <Border Background="{DynamicResource EditorFieldBackground}"
+                                                        BorderBrush="{DynamicResource EditorFieldBorder}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="2">
+                                                    <Path HorizontalAlignment="Right"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,8,0"
+                                                          Data="M 0 0 L 4 4 L 8 0 Z"
+                                                          Fill="{DynamicResource EditorText}" />
+                                                </Border>
+                                            </ControlTemplate>
+                                        </ToggleButton.Template>
+                                    </ToggleButton>
+                                    <ContentPresenter IsHitTestVisible="False"
+                                                      Margin="6,0,22,0"
+                                                      HorizontalAlignment="Left"
+                                                      VerticalAlignment="Center"
+                                                      Content="{TemplateBinding SelectionBoxItem}"
+                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                      TextElement.Foreground="{DynamicResource EditorText}" />
+                                    <Popup IsOpen="{TemplateBinding IsDropDownOpen}"
+                                           Placement="Bottom"
+                                           AllowsTransparency="True"
+                                           Focusable="False"
+                                           PopupAnimation="Slide">
+                                        <Border Background="{DynamicResource EditorFieldBackground}"
+                                                BorderBrush="{DynamicResource EditorFieldBorder}"
+                                                BorderThickness="1"
+                                                MaxHeight="240"
+                                                MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                                            <ScrollViewer>
+                                                <ItemsPresenter />
+                                            </ScrollViewer>
+                                        </Border>
+                                    </Popup>
+                                </Grid>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+
+                <!-- A small clickable swatch that shows the field's current color and opens a
+                     native color picker (so users don't have to type hex by hand). -->
+                <Style x:Key="ColorSwatchButton" TargetType="Button">
+                    <Setter Property="Width" Value="26" />
+                    <Setter Property="Height" Value="18" />
+                    <Setter Property="Cursor" Value="Hand" />
+                    <Setter Property="ToolTip" Value="Pick a color" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}"
+                                        BorderBrush="{DynamicResource EditorFieldBorder}"
+                                        BorderThickness="1"
+                                        CornerRadius="2" />
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
                 </Style>
                 <Style TargetType="Button">
                     <Setter Property="Foreground" Value="{DynamicResource EditorText}" />
@@ -83,13 +179,23 @@
                 <TextBox x:Name="NameBox" Margin="0,2,0,8" />
 
                 <TextBlock FontWeight="SemiBold" Text="Background" />
-                <StackPanel Margin="0,2,0,8" Orientation="Horizontal">
+                <StackPanel Margin="0,2,0,2" Orientation="Horizontal">
                     <Button x:Name="PickImageButton" Click="OnPickImageClick" Content="Choose image…" />
                     <Button x:Name="ClearImageButton" Click="OnClearImageClick" Content="Clear" Margin="6,0,0,0" />
                     <TextBlock x:Name="ImagePathText" Margin="10,0,0,0" VerticalAlignment="Center" />
                 </StackPanel>
+                <TextBlock Margin="0,0,0,8"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource EditorSecondaryText}"
+                           Text="PNG with transparency (alpha) required. Recommended at least 360 × 440 px to cover the callout — use 2× (≈720 × 880 px) for sharp high-DPI displays. Maximum 1024 × 1536 px and 2 MB." />
                 <TextBlock Text="Fallback color (#AARRGGBB or #RRGGBB)" />
-                <TextBox x:Name="FallbackColorBox" Margin="0,2,0,8" TextChanged="OnAnyFieldChanged" />
+                <DockPanel Margin="0,2,0,8" LastChildFill="True">
+                    <Button DockPanel.Dock="Right" Style="{StaticResource ColorSwatchButton}" Margin="6,0,0,0"
+                            Click="OnPickColor" Tag="{Binding ElementName=FallbackColorBox}"
+                            Background="{Binding Text, ElementName=FallbackColorBox, Converter={StaticResource HexToBrush}}" />
+                    <TextBox x:Name="FallbackColorBox" TextChanged="OnAnyFieldChanged" />
+                </DockPanel>
                 <TextBlock x:Name="ImportErrorText" Foreground="IndianRed" Margin="0,0,0,8" />
 
                 <TextBlock FontWeight="SemiBold" Text="Fonts" />
@@ -123,6 +229,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="160" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
@@ -131,24 +238,45 @@
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Callout background" VerticalAlignment="Center" />
                     <TextBox x:Name="CalloutBackgroundBrushBox" Grid.Row="0" Grid.Column="1" Margin="0,1" TextChanged="OnAnyFieldChanged" />
+                    <Button Grid.Row="0" Grid.Column="2" Style="{StaticResource ColorSwatchButton}" Margin="6,1,0,1"
+                            Click="OnPickColor" Tag="{Binding ElementName=CalloutBackgroundBrushBox}"
+                            Background="{Binding Text, ElementName=CalloutBackgroundBrushBox, Converter={StaticResource HexToBrush}}" />
 
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Callout border" VerticalAlignment="Center" />
                     <TextBox x:Name="CalloutBorderBrushBox" Grid.Row="1" Grid.Column="1" Margin="0,1" TextChanged="OnAnyFieldChanged" />
+                    <Button Grid.Row="1" Grid.Column="2" Style="{StaticResource ColorSwatchButton}" Margin="6,1,0,1"
+                            Click="OnPickColor" Tag="{Binding ElementName=CalloutBorderBrushBox}"
+                            Background="{Binding Text, ElementName=CalloutBorderBrushBox, Converter={StaticResource HexToBrush}}" />
 
                     <TextBlock Grid.Row="2" Grid.Column="0" Text="Primary text" VerticalAlignment="Center" />
                     <TextBox x:Name="TextPrimaryBrushBox" Grid.Row="2" Grid.Column="1" Margin="0,1" TextChanged="OnAnyFieldChanged" />
+                    <Button Grid.Row="2" Grid.Column="2" Style="{StaticResource ColorSwatchButton}" Margin="6,1,0,1"
+                            Click="OnPickColor" Tag="{Binding ElementName=TextPrimaryBrushBox}"
+                            Background="{Binding Text, ElementName=TextPrimaryBrushBox, Converter={StaticResource HexToBrush}}" />
 
                     <TextBlock Grid.Row="3" Grid.Column="0" Text="Secondary text" VerticalAlignment="Center" />
                     <TextBox x:Name="TextSecondaryBrushBox" Grid.Row="3" Grid.Column="1" Margin="0,1" TextChanged="OnAnyFieldChanged" />
+                    <Button Grid.Row="3" Grid.Column="2" Style="{StaticResource ColorSwatchButton}" Margin="6,1,0,1"
+                            Click="OnPickColor" Tag="{Binding ElementName=TextSecondaryBrushBox}"
+                            Background="{Binding Text, ElementName=TextSecondaryBrushBox, Converter={StaticResource HexToBrush}}" />
 
                     <TextBlock Grid.Row="4" Grid.Column="0" Text="Bar track" VerticalAlignment="Center" />
                     <TextBox x:Name="BarTrackBrushBox" Grid.Row="4" Grid.Column="1" Margin="0,1" TextChanged="OnAnyFieldChanged" />
+                    <Button Grid.Row="4" Grid.Column="2" Style="{StaticResource ColorSwatchButton}" Margin="6,1,0,1"
+                            Click="OnPickColor" Tag="{Binding ElementName=BarTrackBrushBox}"
+                            Background="{Binding Text, ElementName=BarTrackBrushBox, Converter={StaticResource HexToBrush}}" />
 
                     <TextBlock Grid.Row="5" Grid.Column="0" Text="Separator" VerticalAlignment="Center" />
                     <TextBox x:Name="SeparatorBrushBox" Grid.Row="5" Grid.Column="1" Margin="0,1" TextChanged="OnAnyFieldChanged" />
+                    <Button Grid.Row="5" Grid.Column="2" Style="{StaticResource ColorSwatchButton}" Margin="6,1,0,1"
+                            Click="OnPickColor" Tag="{Binding ElementName=SeparatorBrushBox}"
+                            Background="{Binding Text, ElementName=SeparatorBrushBox, Converter={StaticResource HexToBrush}}" />
 
                     <TextBlock Grid.Row="6" Grid.Column="0" Text="Accent" VerticalAlignment="Center" />
                     <TextBox x:Name="AccentBrushBox" Grid.Row="6" Grid.Column="1" Margin="0,1" TextChanged="OnAnyFieldChanged" />
+                    <Button Grid.Row="6" Grid.Column="2" Style="{StaticResource ColorSwatchButton}" Margin="6,1,0,1"
+                            Click="OnPickColor" Tag="{Binding ElementName=AccentBrushBox}"
+                            Background="{Binding Text, ElementName=AccentBrushBox, Converter={StaticResource HexToBrush}}" />
                 </Grid>
 
                 <TextBlock FontWeight="SemiBold" Text="Severity colors" />
@@ -156,6 +284,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="160" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition /><RowDefinition /><RowDefinition />
@@ -163,12 +292,21 @@
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Ok" VerticalAlignment="Center" />
                     <TextBox x:Name="SeverityOkBox" Grid.Row="0" Grid.Column="1" Margin="0,1" TextChanged="OnAnyFieldChanged" />
+                    <Button Grid.Row="0" Grid.Column="2" Style="{StaticResource ColorSwatchButton}" Margin="6,1,0,1"
+                            Click="OnPickColor" Tag="{Binding ElementName=SeverityOkBox}"
+                            Background="{Binding Text, ElementName=SeverityOkBox, Converter={StaticResource HexToBrush}}" />
 
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Warn" VerticalAlignment="Center" />
                     <TextBox x:Name="SeverityWarnBox" Grid.Row="1" Grid.Column="1" Margin="0,1" TextChanged="OnAnyFieldChanged" />
+                    <Button Grid.Row="1" Grid.Column="2" Style="{StaticResource ColorSwatchButton}" Margin="6,1,0,1"
+                            Click="OnPickColor" Tag="{Binding ElementName=SeverityWarnBox}"
+                            Background="{Binding Text, ElementName=SeverityWarnBox, Converter={StaticResource HexToBrush}}" />
 
                     <TextBlock Grid.Row="2" Grid.Column="0" Text="Critical" VerticalAlignment="Center" />
                     <TextBox x:Name="SeverityCriticalBox" Grid.Row="2" Grid.Column="1" Margin="0,1" TextChanged="OnAnyFieldChanged" />
+                    <Button Grid.Row="2" Grid.Column="2" Style="{StaticResource ColorSwatchButton}" Margin="6,1,0,1"
+                            Click="OnPickColor" Tag="{Binding ElementName=SeverityCriticalBox}"
+                            Background="{Binding Text, ElementName=SeverityCriticalBox, Converter={StaticResource HexToBrush}}" />
                 </Grid>
 
                 <TextBlock x:Name="ContrastWarningText" Foreground="DarkOrange" TextWrapping="Wrap" Margin="0,0,0,8" />

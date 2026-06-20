@@ -137,8 +137,8 @@ internal sealed partial class App : Application, IDisposable
         var pickerViewModel = new ThemePickerViewModel(state, _themeStore);
         var popup = new ThemePickerPopup(pickerViewModel, _fontResolver!);
         popup.ThemeSelected += (_, args) => OnThemeSelected(args.ThemeId);
-        popup.EditThemeRequested += (_, args) => OpenEditor(args.Entry.Theme);
-        popup.AddNewThemeRequested += (_, _) => OnAddNewTheme(state);
+        popup.EditThemeRequested += (_, args) => EditFromPicker(popup, () => OpenEditor(args.Entry.Theme));
+        popup.AddNewThemeRequested += (_, _) => EditFromPicker(popup, () => OnAddNewTheme(state));
         popup.ThemeDeleted += (_, _) => OnThemeButtonClicked();
 
         // Position beside the live callout, clamped to the callout's OWN monitor work area
@@ -149,6 +149,17 @@ internal sealed partial class App : Application, IDisposable
         popup.PositionNextTo(_calloutWindow, workArea);
         popup.Show();
         popup.PositionNextTo(_calloutWindow, workArea);
+    }
+
+    /// <summary>Closes the picker so it isn't floating over the (modal) editor, runs the
+    /// editor, then reopens a freshly-loaded picker once the editor closes so it reflects any
+    /// new/edited theme. The editor's <see cref="ThemeEditorWindow.ShowDialog"/> blocks until
+    /// it closes, so this reads top-to-bottom.</summary>
+    private void EditFromPicker(ThemePickerPopup popup, Action openEditor)
+    {
+        popup.Close();
+        openEditor();
+        OnThemeButtonClicked();
     }
 
     private void OnThemeSelected(string themeId)

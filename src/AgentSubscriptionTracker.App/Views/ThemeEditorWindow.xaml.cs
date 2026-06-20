@@ -36,6 +36,12 @@ public sealed partial class ThemeEditorWindow : Window
 
         InitializeComponent();
 
+        // Open large (~3x the default area) so the form + preview aren't cramped, clamped so
+        // it never exceeds the monitor's working area. WindowStartupLocation re-centers on it.
+        var work = SystemParameters.WorkArea;
+        Width = Math.Min(1320, work.Width * 0.94);
+        Height = Math.Min(970, work.Height * 0.94);
+
         PopulateFontCombo(HeaderFontCombo);
         PopulateFontCombo(BodyFontCombo);
         PopulateFontCombo(FooterFontCombo);
@@ -240,6 +246,41 @@ public sealed partial class ThemeEditorWindow : Window
         _viewModel.ClearBackgroundImage();
         ImagePathText.Text = "(none)";
         ImportErrorText.Text = string.Empty;
+    }
+
+    /// <summary>SPEC-0004 §5.2 — opens the RGBA color picker for the field named by the swatch
+    /// button's <see cref="FrameworkElement.Tag"/> and writes the chosen color back as
+    /// "#AARRGGBB". Writing the text raises the box's TextChanged, refreshing the live preview
+    /// through the normal field pipeline.</summary>
+    private void OnPickColor(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button { Tag: System.Windows.Controls.TextBox target })
+        {
+            return;
+        }
+
+        var initial = Colors.Black;
+        try
+        {
+            if (ColorConverter.ConvertFromString(target.Text) is Color current)
+            {
+                initial = current;
+            }
+        }
+        catch (FormatException)
+        {
+            // No parseable current value — start the picker from black.
+        }
+
+        var picker = new ColorPickerWindow(initial) { Owner = this };
+        if (picker.ShowDialog() != true)
+        {
+            return;
+        }
+
+        var c = picker.SelectedColor;
+        target.Text = string.Create(
+            CultureInfo.InvariantCulture, $"#{c.A:X2}{c.R:X2}{c.G:X2}{c.B:X2}");
     }
 
     private void OnSaveClick(object sender, RoutedEventArgs e)

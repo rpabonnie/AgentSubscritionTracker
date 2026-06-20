@@ -49,18 +49,17 @@
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Right"
                                HorizontalAlignment="Right"
-                               FontSize="11"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Text="{Binding PlanText}"
                                Visibility="{Binding PlanText, Converter={StaticResource NullToCollapsed}}" />
-                    <TextBlock FontSize="13"
-                               FontWeight="SemiBold"
+                    <TextBlock FontFamily="{DynamicResource HeaderFontFamily}"
+                               FontSize="{DynamicResource HeaderFontSize}"
+                               FontWeight="{DynamicResource HeaderFontWeight}"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                Text="{Binding ProviderName}" />
                 </DockPanel>
 
                 <TextBlock Margin="0,3,0,0"
-                           FontSize="11"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            Text="{Binding StateMessage}"
                            TextWrapping="Wrap"
@@ -79,11 +78,9 @@
                                 <DockPanel Grid.Row="0">
                                     <TextBlock DockPanel.Dock="Right"
                                                HorizontalAlignment="Right"
-                                               FontSize="11"
                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                Text="{Binding ValueText}" />
-                                    <TextBlock FontSize="11"
-                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                    <TextBlock Foreground="{DynamicResource TextPrimaryBrush}"
                                                Text="{Binding Label}" />
                                 </DockPanel>
 
@@ -110,7 +107,9 @@
 
                                 <TextBlock Grid.Row="2"
                                            Margin="0,2,0,0"
-                                           FontSize="10"
+                                           FontFamily="{DynamicResource FooterFontFamily}"
+                                           FontSize="{DynamicResource FooterFontSize}"
+                                           FontWeight="{DynamicResource FooterFontWeight}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            Text="{Binding ResetText}"
                                            Visibility="{Binding ResetText, Converter={StaticResource NullToCollapsed}}" />
@@ -120,7 +119,9 @@
                 </ItemsControl>
 
                 <TextBlock Margin="0,5,0,0"
-                           FontSize="10"
+                           FontFamily="{DynamicResource FooterFontFamily}"
+                           FontSize="{DynamicResource FooterFontSize}"
+                           FontWeight="{DynamicResource FooterFontWeight}"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            Text="{Binding FooterText}"
                            Visibility="{Binding FooterText, Converter={StaticResource NullToCollapsed}}" />
@@ -128,19 +129,25 @@
         </DataTemplate>
     </UserControl.Resources>
 
+    <!-- Body fonts are set on the root so all text inherits them by default (SPEC-0004 §5.2 —
+         theme fonts now actually drive the callout); header/footer roles override below. -->
     <Border Margin="12"
             Padding="14,10,14,10"
             Background="{DynamicResource CalloutBackgroundBrush}"
             BorderBrush="{DynamicResource CalloutBorderBrush}"
             BorderThickness="1"
-            CornerRadius="8">
+            CornerRadius="8"
+            TextElement.FontFamily="{DynamicResource BodyFontFamily}"
+            TextElement.FontSize="{DynamicResource BodyFontSize}"
+            TextElement.FontWeight="{DynamicResource BodyFontWeight}">
         <Border.Effect>
             <DropShadowEffect BlurRadius="12" Opacity="0.35" ShadowDepth="2" />
         </Border.Effect>
 
         <StackPanel>
-            <TextBlock FontSize="11"
-                       FontWeight="SemiBold"
+            <TextBlock FontFamily="{DynamicResource HeaderFontFamily}"
+                       FontSize="{DynamicResource HeaderFontSize}"
+                       FontWeight="{DynamicResource HeaderFontWeight}"
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        Text="AGENT SUBSCRIPTIONS" />
 
@@ -172,7 +179,9 @@
                         Style="{StaticResource CommandButton}" />
                 <TextBlock x:Name="AgeText"
                            VerticalAlignment="Center"
-                           FontSize="10"
+                           FontFamily="{DynamicResource FooterFontFamily}"
+                           FontSize="{DynamicResource FooterFontSize}"
+                           FontWeight="{DynamicResource FooterFontWeight}"
                            Foreground="{DynamicResource TextSecondaryBrush}" />
             </DockPanel>
         </StackPanel>
