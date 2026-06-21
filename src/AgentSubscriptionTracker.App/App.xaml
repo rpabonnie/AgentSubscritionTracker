@@ -4,6 +4,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:AgentSubscriptionTracker.App">
     <Application.Resources>
-         
+        <!-- Intentionally empty: the active theme is applied here at runtime via
+             ThemeResourceApplier.Apply, which CLEARS Application.Resources.MergedDictionaries on
+             every swap. The theme-management design system (EditorDesignSystem.xaml) is therefore
+             merged per-window (picker/editor/color-picker) instead of here, so a theme swap can
+             never wipe it out — and it stays entirely out of the live callout's resource scope. -->
     </Application.Resources>
 </Application>

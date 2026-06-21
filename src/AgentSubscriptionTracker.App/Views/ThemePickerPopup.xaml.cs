@@ -4,6 +4,8 @@
 
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
 using AgentSubscriptionTracker.App.Theming;
 using AgentSubscriptionTracker.App.ViewModels;
 
@@ -49,7 +51,69 @@ public sealed partial class ThemePickerPopup : Window
 
         InitializeComponent();
         ThemeListItems.ItemsSource = viewModel.Entries;
+
+        // The popup opens non-activating (ShowActivated=False) so it doesn't steal focus the
+        // instant it appears — but to dismiss on Esc / click-away it needs keyboard focus. Grab
+        // it AFTER the shell finishes positioning (Background priority runs once OnThemeButton-
+        // Clicked's synchronous Show + PositionNextTo calls have completed), so activation can't
+        // race the placement that reads the still-visible callout's bounds.
+        Loaded += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+        {
+            Activate();
+            Focus();
+        });
     }
+
+    private bool _closing;
+
+    /// <summary>Marks the window as closing the instant ANY close path begins (this window's own
+    /// dismiss handlers, or the shell calling <see cref="Window.Close"/> to open the editor). Once
+    /// set, <see cref="CloseSafely"/> and <see cref="OnDeactivated"/> never call
+    /// <see cref="Window.Close"/> again — WPF throws "Cannot call Close while a Window is closing"
+    /// if a deactivation message arrives mid-close (the activated picker loses focus as it closes
+    /// to open the editor).</summary>
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        _closing = true;
+        base.OnClosing(e);
+    }
+
+    /// <summary>Closes once; guards against re-entrancy from overlapping dismiss paths
+    /// (Esc, deactivation, the close button) and from a close already in progress.</summary>
+    private void CloseSafely()
+    {
+        if (_closing)
+        {
+            return;
+        }
+
+        _closing = true;
+        Close();
+    }
+
+    /// <summary>Esc dismisses the picker without changing the active theme.</summary>
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        base.OnPreviewKeyDown(e);
+        if (e is { Key: Key.Escape, Handled: false })
+        {
+            CloseSafely();
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>Click-away (losing activation) dismisses the picker, like a flyout — unless a
+    /// close is already underway (see <see cref="OnClosing"/>).</summary>
+    protected override void OnDeactivated(EventArgs e)
+    {
+        base.OnDeactivated(e);
+        if (!_closing)
+        {
+            CloseSafely();
+        }
+    }
+
+    private void OnCloseClick(object sender, RoutedEventArgs e) => CloseSafely();
 
     /// <summary>SPEC-0004 §5.1 — themes one row's live preview. Each <see cref="CalloutContent"/>
     /// is bound to the shared sample data and gets its OWN preview-scoped resource dictionary

@@ -1,16 +1,21 @@
-<!-- SPEC-0004 §5.1 — non-activating popup listing installed themes. Each row shows a LIVE
-     scaled preview of the actual callout rendered in that theme (the shared CalloutContent
-     bound to sample data + a row-scoped theme dictionary), a name caption with a checkmark
-     for the active theme, and Edit/Delete; clicking a preview selects that theme. Active
-     theme first then alphabetical, then a separated "Add new theme" entry. Borderless/
-     AllowsTransparency, same family of behavior as CalloutWindow (ShowActivated=False). -->
+<!-- SPEC-0004 §5.1 — non-activating popup listing installed themes as a grid of tiles. Each
+     tile shows a LIVE scaled preview of the actual callout rendered in that theme (the shared
+     CalloutContent bound to sample data + a row-scoped theme dictionary), a name caption with a
+     checkmark for the active theme, a palette dot strip, and hover-revealed Edit/Delete; clicking
+     a preview selects that theme. Active theme first then alphabetical, then a "Add new theme"
+     ghost tile. Borderless/AllowsTransparency, same family of behavior as CalloutWindow
+     (ShowActivated=False).
+
+     Chrome: the popup paints itself with the shared Editor* DARK chrome (a consistent control
+     surface, like a command palette), while each tile's preview keeps its own per-theme scoped
+     resources (OnPreviewLoaded) so the previews still render each theme faithfully. -->
 <Window x:Class="AgentSubscriptionTracker.App.Views.ThemePickerPopup"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:AgentSubscriptionTracker.App.Views"
         xmlns:vm="clr-namespace:AgentSubscriptionTracker.App.ViewModels"
         Title="Themes"
-        Width="340"
+        Width="540"
         SizeToContent="Height"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -18,103 +23,221 @@
         Topmost="True"
         ShowActivated="False"
         ShowInTaskbar="False"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Ideal"
+        FontFamily="Segoe UI Variable Text, Segoe UI"
         ResizeMode="NoResize">
 
     <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVisible" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- The popup's own chrome (Editor* keys) + the shared design system (tokens +
+                     keyed control templates). App-root-absolute pack URIs. -->
+                <ResourceDictionary Source="/Themes/EditorChromeDark.xaml" />
+                <ResourceDictionary Source="/Themes/EditorDesignSystem.xaml" />
+            </ResourceDictionary.MergedDictionaries>
 
-        <!-- Borderless button so the whole live preview is one big click target with no
-             button chrome drawn around it. -->
-        <Style x:Key="PreviewSelectButton" TargetType="Button">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="HorizontalContentAlignment" Value="Center" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+            <BooleanToVisibilityConverter x:Key="BoolToVisible" />
+            <views:HexToBrushConverter x:Key="HexToBrush" />
+
+            <!-- Borderless button so the whole live preview is one big click target. -->
+            <Style x:Key="PreviewSelectButton" TargetType="Button">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}"
+                                    CornerRadius="6"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" />
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Tile card: rest = flat card; hover = strong border; active = accent ring + tint. -->
+            <Style x:Key="ThemeTile" TargetType="Border">
+                <Setter Property="Width" Value="150" />
+                <Setter Property="Margin" Value="6" />
+                <Setter Property="Padding" Value="10" />
+                <Setter Property="CornerRadius" Value="{StaticResource RadiusCard}" />
+                <Setter Property="Background" Value="{DynamicResource EditorCardBackground}" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="2" />
+                <Setter Property="SnapsToDevicePixels" Value="True" />
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderStrong}" />
+                    </Trigger>
+                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource EditorAccent}" />
+                        <Setter Property="Background" Value="{DynamicResource EditorAccentSubtle}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- Solid floating action bar revealed on tile hover / keyboard focus. A solid
+                 surface (not transparent buttons) so Edit/Delete stay legible over light theme
+                 previews. Hidden = click-through, so it never blocks "click to use this theme". -->
+            <Style x:Key="TileActionsBar" TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource EditorCardBackground}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderStrong}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Padding" Value="3" />
+                <Setter Property="Opacity" Value="0" />
+                <Setter Property="IsHitTestVisible" Value="False" />
+                <Setter Property="Effect">
+                    <Setter.Value>
+                        <DropShadowEffect BlurRadius="10" ShadowDepth="1" Opacity="0.4" Color="#000000" />
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Border}}" Value="True">
+                        <Setter Property="Opacity" Value="1" />
+                        <Setter Property="IsHitTestVisible" Value="True" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=Border}}" Value="True">
+                        <Setter Property="Opacity" Value="1" />
+                        <Setter Property="IsHitTestVisible" Value="True" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- Dashed "ghost" Add-new-theme tile button. -->
+            <Style x:Key="GhostAddButton" TargetType="Button">
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="MinHeight" Value="40" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Grid>
+                                <Rectangle x:Name="dash" RadiusX="10" RadiusY="10"
+                                           Fill="Transparent"
+                                           Stroke="{DynamicResource EditorBorderStrong}"
+                                           StrokeThickness="1.4" StrokeDashArray="4 3" />
+                                <TextBlock x:Name="lbl" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource EditorAccent}"
+                                           Text="+  Add new theme" />
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="dash" Property="Stroke" Value="{DynamicResource EditorAccent}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
     </Window.Resources>
 
-    <Border Margin="8"
-            Padding="6"
-            Background="{DynamicResource CalloutBackgroundBrush}"
-            BorderBrush="{DynamicResource CalloutBorderBrush}"
+    <Border Margin="12"
+            Padding="14"
+            Background="{DynamicResource EditorPanelBackground}"
+            BorderBrush="{DynamicResource EditorDivider}"
             BorderThickness="1"
-            CornerRadius="8">
+            CornerRadius="{StaticResource RadiusOverlay}">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="12" Opacity="0.35" ShadowDepth="2" />
+            <DropShadowEffect BlurRadius="24" Opacity="0.4" ShadowDepth="6" Color="#000000" />
         </Border.Effect>
 
         <StackPanel>
+            <DockPanel Margin="4,2,0,10" LastChildFill="False">
+                <TextBlock DockPanel.Dock="Left" Style="{StaticResource TextTitle}"
+                           VerticalAlignment="Center" Text="Themes" />
+                <Button DockPanel.Dock="Right" Click="OnCloseClick"
+                        Style="{StaticResource SubtleButton}"
+                        Content="✕" Width="34" MinHeight="30" Padding="0" FontSize="14"
+                        ToolTip="Close (Esc)" />
+            </DockPanel>
+
             <ScrollViewer MaxHeight="620"
                           HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
+                <ScrollViewer.Resources>
+                    <Style TargetType="ScrollBar" BasedOn="{StaticResource ThinScrollBar}" />
+                </ScrollViewer.Resources>
                 <ItemsControl x:Name="ThemeListItems">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:ThemeListEntryViewModel}">
-                            <Border Margin="0,4"
-                                    Padding="6"
-                                    BorderThickness="1"
-                                    CornerRadius="6">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Setter Property="BorderBrush" Value="Transparent" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Border.Style>
-                                <StackPanel>
-                                    <!-- Name caption + per-theme actions. -->
-                                    <DockPanel LastChildFill="True"
-                                               Margin="0,0,0,4"
-                                               ToolTip="{Binding DisambiguatedDisplayName}">
-                                        <Button DockPanel.Dock="Right"
-                                                Click="OnDeleteClick"
-                                                Content="Delete"
-                                                FontSize="12"
-                                                Tag="{Binding}" />
-                                        <Button DockPanel.Dock="Right"
-                                                Margin="0,0,4,0"
-                                                Click="OnEditClick"
-                                                Content="Edit"
-                                                FontSize="12"
-                                                Tag="{Binding}" />
-                                        <TextBlock DockPanel.Dock="Left"
-                                                   Width="16"
-                                                   VerticalAlignment="Center"
-                                                   FontSize="13"
-                                                   Foreground="{DynamicResource AccentBrush}"
-                                                   Text="✓"
-                                                   Visibility="{Binding IsActive, Converter={StaticResource BoolToVisible}}" />
-                                        <TextBlock VerticalAlignment="Center"
-                                                   FontSize="13"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                                   Text="{Binding TruncatedDisplayName}"
-                                                   TextTrimming="CharacterEllipsis" />
-                                    </DockPanel>
+                            <Border Style="{StaticResource ThemeTile}" ToolTip="{Binding DisambiguatedDisplayName}">
+                                <Grid>
+                                    <StackPanel>
+                                        <!-- Live, scaled-down callout rendered in this theme. Click to use it. -->
+                                        <Button Style="{StaticResource PreviewSelectButton}"
+                                                Click="OnSelectClick"
+                                                Tag="{Binding}"
+                                                ToolTip="Click to use this theme">
+                                            <Viewbox Width="126" Stretch="Uniform">
+                                                <views:CalloutContent Loaded="OnPreviewLoaded" IsHitTestVisible="False" />
+                                            </Viewbox>
+                                        </Button>
 
-                                    <!-- Live, scaled-down callout rendered in this theme. Click to use it. -->
-                                    <Button Style="{StaticResource PreviewSelectButton}"
-                                            Click="OnSelectClick"
-                                            Tag="{Binding}"
-                                            ToolTip="Click to use this theme">
-                                        <Viewbox Width="260" Stretch="Uniform">
-                                            <views:CalloutContent Loaded="OnPreviewLoaded" IsHitTestVisible="False" />
-                                        </Viewbox>
-                                    </Button>
-                                </StackPanel>
+                                        <!-- Name caption with active checkmark. -->
+                                        <DockPanel Margin="2,8,2,0" LastChildFill="True">
+                                            <TextBlock DockPanel.Dock="Left"
+                                                       Margin="0,0,4,0"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="13"
+                                                       Foreground="{DynamicResource EditorAccent}"
+                                                       Text="✓"
+                                                       Visibility="{Binding IsActive, Converter={StaticResource BoolToVisible}}" />
+                                            <TextBlock VerticalAlignment="Center"
+                                                       FontSize="13"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource EditorText}"
+                                                       Text="{Binding TruncatedDisplayName}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </DockPanel>
+
+                                        <!-- Palette dot strip (this theme's key colors). -->
+                                        <StackPanel Orientation="Horizontal" Margin="2,8,0,2">
+                                            <Ellipse Width="11" Height="11" Margin="0,0,4,0"
+                                                     Stroke="{DynamicResource EditorDivider}" StrokeThickness="1"
+                                                     Fill="{Binding Theme.Manifest.Brushes.CalloutBackgroundBrush, Converter={StaticResource HexToBrush}}" />
+                                            <Ellipse Width="11" Height="11" Margin="0,0,4,0"
+                                                     Stroke="{DynamicResource EditorDivider}" StrokeThickness="1"
+                                                     Fill="{Binding Theme.Manifest.Brushes.AccentBrush, Converter={StaticResource HexToBrush}}" />
+                                            <Ellipse Width="11" Height="11" Margin="0,0,4,0"
+                                                     Stroke="{DynamicResource EditorDivider}" StrokeThickness="1"
+                                                     Fill="{Binding Theme.Manifest.SeverityBands.Ok, Converter={StaticResource HexToBrush}}" />
+                                            <Ellipse Width="11" Height="11" Margin="0,0,4,0"
+                                                     Stroke="{DynamicResource EditorDivider}" StrokeThickness="1"
+                                                     Fill="{Binding Theme.Manifest.SeverityBands.Warn, Converter={StaticResource HexToBrush}}" />
+                                            <Ellipse Width="11" Height="11"
+                                                     Stroke="{DynamicResource EditorDivider}" StrokeThickness="1"
+                                                     Fill="{Binding Theme.Manifest.SeverityBands.Critical, Converter={StaticResource HexToBrush}}" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- Hover/focus-revealed actions, top-right, on a solid bar. -->
+                                    <Border Style="{StaticResource TileActionsBar}"
+                                            HorizontalAlignment="Right" VerticalAlignment="Top"
+                                            Margin="0,2,2,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Click="OnEditClick" Content="Edit" Tag="{Binding}"
+                                                    Style="{StaticResource SubtleButton}" BorderThickness="0"
+                                                    MinHeight="24" FontSize="12" Padding="8,0" />
+                                            <Button Click="OnDeleteClick" Content="Delete" Tag="{Binding}"
+                                                    Style="{StaticResource DangerButton}" BorderThickness="0"
+                                                    MinHeight="24" FontSize="12" Padding="8,0" Margin="2,0,0,0" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -122,15 +245,16 @@
             </ScrollViewer>
 
             <TextBlock x:Name="DeleteRefusalMessage"
-                       Margin="2,4,2,0"
-                       FontSize="11"
-                       Foreground="{DynamicResource AccentBrush}"
+                       Margin="6,8,6,0"
+                       FontSize="12"
+                       Foreground="{DynamicResource EditorWarn}"
                        TextWrapping="Wrap"
                        Visibility="Collapsed" />
 
-            <Rectangle Height="1" Margin="0,6,0,4" Fill="{DynamicResource SeparatorBrush}" />
+            <Border Height="1" Margin="2,12,2,12" Background="{DynamicResource EditorDivider}" />
 
-            <Button Click="OnAddNewThemeClick" Content="Add new theme" HorizontalAlignment="Stretch" />
+            <Button Click="OnAddNewThemeClick" Style="{StaticResource GhostAddButton}"
+                    HorizontalAlignment="Stretch" Margin="6,0" />
         </StackPanel>
     </Border>
 </Window>
