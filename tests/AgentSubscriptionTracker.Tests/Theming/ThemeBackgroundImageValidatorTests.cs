@@ -49,9 +49,12 @@ public sealed class ThemeBackgroundImageValidatorTests
     }
 
     [Fact]
-    public void Validate_DecodedDimensionsExceedCap_ReturnsDimensionsTooLarge()
+    public void Validate_DimensionsExceedCap_ReturnsDimensionsTooLarge()
     {
-        var validator = CreateValidator();
+        // The fixture is 2000x2000; pin the caps below it so the dimension gate fires regardless
+        // of the (larger) production default.
+        var validator = new ThemeBackgroundImageValidator(
+            ThemeBackgroundImageValidator.DefaultMaxFileSizeBytes, 1024, 1536);
 
         var result = validator.Validate(FixturesThemeFolder(), "oversized_2000x2000.png");
 
@@ -60,9 +63,11 @@ public sealed class ThemeBackgroundImageValidatorTests
     }
 
     [Fact]
-    public void Validate_FileSizeExceedsTwoMegabyteCap_ReturnsFileTooLarge_BeforeAnyDecodeAttempt()
+    public void Validate_FileSizeExceedsCap_ReturnsFileTooLarge_BeforeAnyDecodeAttempt()
     {
-        var validator = CreateValidator();
+        // The fixture is ~2.5 MB; pin the cap below it so the size gate fires regardless of
+        // the (larger) production default.
+        var validator = new ThemeBackgroundImageValidator(2 * 1024 * 1024);
 
         var result = validator.Validate(FixturesThemeFolder(), "oversized_filesize.png");
 
@@ -121,9 +126,9 @@ public sealed class ThemeBackgroundImageValidatorTests
     {
         // oversized_filesize.png is also a valid, real-alpha PNG at 1024x1536 (within
         // the dimension cap) by construction — only its on-disk byte size exceeds the
-        // 2 MB cap. If size were checked after decode, this would incorrectly pass or
+        // pinned cap. If size were checked after decode, this would incorrectly pass or
         // fail for the wrong reason; asserting FileTooLarge here pins the §4.3 ordering.
-        var validator = CreateValidator();
+        var validator = new ThemeBackgroundImageValidator(2 * 1024 * 1024);
 
         var result = validator.Validate(FixturesThemeFolder(), "oversized_filesize.png");
 

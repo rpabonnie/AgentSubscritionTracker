@@ -133,7 +133,7 @@
          theme fonts now actually drive the callout); header/footer roles override below. -->
     <Border Margin="12"
             Padding="14,10,14,10"
-            Background="{DynamicResource CalloutBackgroundBrush}"
+            Background="{DynamicResource CalloutBackgroundPaint}"
             BorderBrush="{DynamicResource CalloutBorderBrush}"
             BorderThickness="1"
             CornerRadius="8"

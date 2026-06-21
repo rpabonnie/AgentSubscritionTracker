@@ -10,6 +10,7 @@ using System.Windows.Media;
 using Microsoft.Win32;
 using AgentSubscriptionTracker.App.Theming;
 using AgentSubscriptionTracker.App.Tray;
+using AgentSubscriptionTracker.App.Utils;
 using AgentSubscriptionTracker.App.ViewModels;
 
 namespace AgentSubscriptionTracker.App.Views;
@@ -36,11 +37,15 @@ public sealed partial class ThemeEditorWindow : Window
 
         InitializeComponent();
 
-        // Open large (~3x the default area) so the form + preview aren't cramped, clamped so
-        // it never exceeds the monitor's working area. WindowStartupLocation re-centers on it.
+        // Sized for the two-column card layout (form + 380px preview), clamped so it never
+        // exceeds the monitor's working area. WindowStartupLocation re-centers on it.
         var work = SystemParameters.WorkArea;
-        Width = Math.Min(1320, work.Width * 0.94);
-        Height = Math.Min(970, work.Height * 0.94);
+        Width = Math.Min(1000, work.Width * 0.94);
+        Height = Math.Min(780, work.Height * 0.94);
+
+        // Match the native title bar to the editor's own light/dark chrome (default dark) so a
+        // dark window doesn't pair with a bright system title bar.
+        SourceInitialized += (_, _) => ApplyChromeTitleBar();
 
         PopulateFontCombo(HeaderFontCombo);
         PopulateFontCombo(BodyFontCombo);
@@ -77,7 +82,17 @@ public sealed partial class ThemeEditorWindow : Window
             : "/Themes/EditorChromeDark.xaml";
 
         Resources.MergedDictionaries[0] = new ResourceDictionary { Source = new Uri(path, UriKind.Relative) };
+        ApplyChromeTitleBar();
     }
+
+    /// <summary>Keeps the native title bar in sync with the editor's Light/Dark chrome.</summary>
+    private void ApplyChromeTitleBar() => WindowTitleBarTheme.Apply(this, dark: LightChromeRadio.IsChecked != true);
+
+    /// <summary>The pack URI of the chrome dictionary currently at MergedDictionaries[0], so the
+    /// color picker can mirror the editor's Light/Dark appearance.</summary>
+    private string CurrentChromeSource => LightChromeRadio.IsChecked == true
+        ? "/Themes/EditorChromeLight.xaml"
+        : "/Themes/EditorChromeDark.xaml";
 
     private static void PopulateFontCombo(System.Windows.Controls.ComboBox combo)
     {
@@ -183,7 +198,11 @@ public sealed partial class ThemeEditorWindow : Window
 
     private void UpdatePreview()
     {
-        ContrastWarningText.Text = _viewModel.LowContrastWarning ?? string.Empty;
+        var warning = _viewModel.LowContrastWarning ?? string.Empty;
+        ContrastWarningText.Text = warning;
+        ContrastWarningBanner.Visibility = string.IsNullOrEmpty(warning)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
 
         ThemeManifest manifest;
         try
@@ -204,7 +223,7 @@ public sealed partial class ThemeEditorWindow : Window
             Manifest = manifest,
             Status = ThemeLoadStatus.Ok,
             IsBuiltIn = false,
-            BackgroundImage = null,
+            BackgroundImage = _viewModel.BackgroundImagePreview,
             FolderPath = string.Empty,
         };
 
@@ -233,19 +252,31 @@ public sealed partial class ThemeEditorWindow : Window
         if (_viewModel.TryImportBackgroundImage(dialog.FileName))
         {
             ImagePathText.Text = _viewModel.BackgroundImagePath ?? "(none)";
-            ImportErrorText.Text = string.Empty;
+            SetImportError(null);
         }
         else
         {
-            ImportErrorText.Text = "Could not import the selected image.";
+            SetImportError(_viewModel.ImportError ?? "Could not import the selected image.");
         }
+
+        UpdatePreview();
     }
 
     private void OnClearImageClick(object sender, RoutedEventArgs e)
     {
         _viewModel.ClearBackgroundImage();
         ImagePathText.Text = "(none)";
-        ImportErrorText.Text = string.Empty;
+        SetImportError(null);
+        UpdatePreview();
+    }
+
+    /// <summary>Shows/hides the tinted import-error banner.</summary>
+    private void SetImportError(string? message)
+    {
+        ImportErrorText.Text = message ?? string.Empty;
+        ImportErrorBanner.Visibility = string.IsNullOrEmpty(message)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
     }
 
     /// <summary>SPEC-0004 §5.2 — opens the RGBA color picker for the field named by the swatch
@@ -272,7 +303,7 @@ public sealed partial class ThemeEditorWindow : Window
             // No parseable current value — start the picker from black.
         }
 
-        var picker = new ColorPickerWindow(initial) { Owner = this };
+        var picker = new ColorPickerWindow(initial, CurrentChromeSource) { Owner = this };
         if (picker.ShowDialog() != true)
         {
             return;

@@ -21,17 +21,22 @@ public static class ThemeResourceApplier
     /// <summary>Builds a new dictionary with every key the callout content binds to,
     /// resolved from <paramref name="theme"/>'s manifest. Background image (if any) is
     /// exposed under <c>CalloutBackgroundImage</c> as a nullable <see cref="ImageSource"/>
-    /// — null means "fallback color only" and callers should keep using
-    /// <c>CalloutBackgroundBrush</c> for the Border's Background.</summary>
+    /// (used by tests/consumers that need the raw source) and pre-composed into
+    /// <c>CalloutBackgroundPaint</c> — the actual brush the Border's Background binds to:
+    /// an <see cref="ImageBrush"/> over the image when one loaded, else the plain
+    /// <c>CalloutBackgroundBrush</c> solid color.</summary>
     public static ResourceDictionary BuildResourceDictionary(LoadedTheme theme, IThemeFontResolver fontResolver)
     {
         ArgumentNullException.ThrowIfNull(theme);
         ArgumentNullException.ThrowIfNull(fontResolver);
 
         var manifest = theme.Manifest;
+        var backgroundBrush = BrushFromHex(manifest.Brushes.CalloutBackgroundBrush);
+        var backgroundImage = theme.Status == ThemeLoadStatus.Ok ? theme.BackgroundImage : null;
         var dictionary = new ResourceDictionary
         {
-            ["CalloutBackgroundBrush"] = BrushFromHex(manifest.Brushes.CalloutBackgroundBrush),
+            ["CalloutBackgroundBrush"] = backgroundBrush,
+            ["CalloutBackgroundPaint"] = BuildBackgroundPaint(backgroundImage, backgroundBrush),
             ["CalloutBorderBrush"] = BrushFromHex(manifest.Brushes.CalloutBorderBrush),
             ["TextPrimaryBrush"] = BrushFromHex(manifest.Brushes.TextPrimaryBrush),
             ["TextSecondaryBrush"] = BrushFromHex(manifest.Brushes.TextSecondaryBrush),
@@ -42,7 +47,7 @@ public static class ThemeResourceApplier
             ["warn"] = BrushFromHex(manifest.SeverityBands.Warn),
             ["critical"] = BrushFromHex(manifest.SeverityBands.Critical),
             ["CalloutBackgroundFallbackBrush"] = BrushFromHex(manifest.Background.FallbackColor),
-            ["CalloutBackgroundImage"] = theme.Status == ThemeLoadStatus.Ok ? theme.BackgroundImage : null,
+            ["CalloutBackgroundImage"] = backgroundImage,
             ["HeaderFontFamily"] = fontResolver.Resolve(manifest.Fonts.Header).Family,
             ["HeaderFontSize"] = fontResolver.Resolve(manifest.Fonts.Header).Size,
             ["HeaderFontWeight"] = fontResolver.Resolve(manifest.Fonts.Header).Weight,
@@ -90,6 +95,18 @@ public static class ThemeResourceApplier
             // raises a per-key DynamicResource invalidation at the preview scope.
             target[entry.Key] = entry.Value;
         }
+    }
+
+    private static Brush BuildBackgroundPaint(ImageSource? backgroundImage, Brush fallback)
+    {
+        if (backgroundImage is null)
+        {
+            return fallback;
+        }
+
+        var brush = new ImageBrush(backgroundImage) { Stretch = Stretch.UniformToFill };
+        brush.Freeze();
+        return brush;
     }
 
     private static SolidColorBrush BrushFromHex(string hex)

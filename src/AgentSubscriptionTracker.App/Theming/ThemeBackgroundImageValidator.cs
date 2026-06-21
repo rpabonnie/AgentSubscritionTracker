@@ -13,7 +13,7 @@ public enum BackgroundImageValidationError
 {
     PathOutsideThemeFolder,
     FileNotFound,
-    FileTooLarge,        // > 2 MB
+    FileTooLarge,        // over the configured cap (default 30 MB)
     NotAPng,
     CorruptOrTruncated,
     DimensionsTooLarge,  // > 1024x1536 decoded
@@ -42,10 +42,45 @@ public interface IThemeBackgroundImageValidator
 /// <summary>PNG-only background image validation pipeline (SPEC-0004 §4.3).</summary>
 public sealed class ThemeBackgroundImageValidator : IThemeBackgroundImageValidator
 {
-    private const long MaxFileSizeBytes = 2 * 1024 * 1024;
-    private const int MaxWidth = 1024;
-    private const int MaxHeight = 1536;
+    /// <summary>Default background-image file-size cap (30 MB). Checked on
+    /// <see cref="FileInfo.Length"/> before any byte of the image is read/decoded.</summary>
+    public const long DefaultMaxFileSizeBytes = 30L * 1024 * 1024;
+
+    /// <summary>Default decoded pixel-dimension caps. Bounds decode memory (an 8192×8192 RGBA
+    /// image is ~256 MB) and is checked from the PNG header BEFORE the full-resolution decode,
+    /// so an oversized image degrades to the fallback color instead of OOM-crashing the decoder.</summary>
+    public const int DefaultMaxWidth = 8192;
+    public const int DefaultMaxHeight = 8192;
+
     private static readonly byte[] PngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+
+    private readonly long _maxFileSizeBytes;
+    private readonly int _maxWidth;
+    private readonly int _maxHeight;
+
+    /// <summary>Uses the default 30 MB file-size cap and 8192×8192 dimension caps.</summary>
+    public ThemeBackgroundImageValidator()
+        : this(DefaultMaxFileSizeBytes, DefaultMaxWidth, DefaultMaxHeight)
+    {
+    }
+
+    /// <summary>Overrides the file-size cap, keeping the default dimension caps.</summary>
+    public ThemeBackgroundImageValidator(long maxFileSizeBytes)
+        : this(maxFileSizeBytes, DefaultMaxWidth, DefaultMaxHeight)
+    {
+    }
+
+    /// <summary>Overrides every cap (e.g. for tests that pin a specific gate with a small
+    /// fixture).</summary>
+    public ThemeBackgroundImageValidator(long maxFileSizeBytes, int maxWidth, int maxHeight)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxFileSizeBytes);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxWidth);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxHeight);
+        _maxFileSizeBytes = maxFileSizeBytes;
+        _maxWidth = maxWidth;
+        _maxHeight = maxHeight;
+    }
 
     // "IEND" — the PNG end-of-stream marker chunk type. WPF's PngBitmapDecoder is lenient
     // about a truncated IDAT stream (it silently zero-fills missing scanlines rather than
@@ -79,7 +114,7 @@ public sealed class ThemeBackgroundImageValidator : IThemeBackgroundImageValidat
             return new BackgroundImageValidationResult(null, BackgroundImageValidationError.FileNotFound);
         }
 
-        if (fileInfo.Length > MaxFileSizeBytes)
+        if (fileInfo.Length > _maxFileSizeBytes)
         {
             return new BackgroundImageValidationResult(null, BackgroundImageValidationError.FileTooLarge);
         }
@@ -109,6 +144,46 @@ public sealed class ThemeBackgroundImageValidator : IThemeBackgroundImageValidat
             return new BackgroundImageValidationResult(null, BackgroundImageValidationError.CorruptOrTruncated);
         }
 
+        // Read dimensions + pixel format from the PNG header WITHOUT decoding pixels
+        // (DelayCreation defers pixel decode; those values come from the IHDR chunk). This lets
+        // us reject an oversized image BEFORE the full-resolution decode below, so a huge image
+        // degrades gracefully instead of OOM-crashing the eager OnLoad decoder.
+        int pixelWidth;
+        int pixelHeight;
+        PixelFormat pixelFormat;
+        try
+        {
+            using var headerStream = File.OpenRead(canonicalPath);
+            var headerDecoder = new PngBitmapDecoder(headerStream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+            if (headerDecoder.Frames.Count == 0)
+            {
+                return new BackgroundImageValidationResult(null, BackgroundImageValidationError.CorruptOrTruncated);
+            }
+
+            var headerFrame = headerDecoder.Frames[0];
+            pixelWidth = headerFrame.PixelWidth;
+            pixelHeight = headerFrame.PixelHeight;
+            pixelFormat = headerFrame.Format;
+        }
+        catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException or IOException or OverflowException or ArgumentException)
+        {
+            return new BackgroundImageValidationResult(null, BackgroundImageValidationError.CorruptOrTruncated);
+        }
+
+        if (pixelWidth > _maxWidth || pixelHeight > _maxHeight)
+        {
+            return new BackgroundImageValidationResult(null, BackgroundImageValidationError.DimensionsTooLarge);
+        }
+
+        if (!HasRealAlphaChannel(pixelFormat))
+        {
+            return new BackgroundImageValidationResult(null, BackgroundImageValidationError.NoAlphaChannel);
+        }
+
+        // Dimensions are now bounded by the cap above, so this full decode + pixel-buffer copy
+        // is memory-bounded. The copy forces truncation/corruption in the image data itself —
+        // not just the header — to surface as CorruptOrTruncated rather than an uncaught
+        // exception later (e.g. from a thumbnail renderer).
         BitmapFrame frame;
         try
         {
@@ -121,12 +196,6 @@ public sealed class ThemeBackgroundImageValidator : IThemeBackgroundImageValidat
 
             frame = decoder.Frames[0];
 
-            // BitmapCacheOption.OnLoad decodes metadata (dimensions/format) eagerly, but a
-            // truncated pixel stream can still pass that and only fail once the actual pixel
-            // data is read. Force a full pixel-buffer copy now so truncation/corruption in
-            // the image data itself — not just the header — surfaces here as
-            // CorruptOrTruncated, never as an uncaught exception later (e.g. from a
-            // thumbnail renderer).
             var stride = (frame.PixelWidth * frame.Format.BitsPerPixel + 7) / 8;
             var buffer = new byte[stride * frame.PixelHeight];
             frame.CopyPixels(buffer, stride, 0);
@@ -134,16 +203,6 @@ public sealed class ThemeBackgroundImageValidator : IThemeBackgroundImageValidat
         catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException or IOException or OverflowException or ArgumentException)
         {
             return new BackgroundImageValidationResult(null, BackgroundImageValidationError.CorruptOrTruncated);
-        }
-
-        if (frame.PixelWidth > MaxWidth || frame.PixelHeight > MaxHeight)
-        {
-            return new BackgroundImageValidationResult(null, BackgroundImageValidationError.DimensionsTooLarge);
-        }
-
-        if (!HasRealAlphaChannel(frame.Format))
-        {
-            return new BackgroundImageValidationResult(null, BackgroundImageValidationError.NoAlphaChannel);
         }
 
         return new BackgroundImageValidationResult(frame, null);

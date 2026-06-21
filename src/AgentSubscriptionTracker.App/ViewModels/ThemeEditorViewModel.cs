@@ -9,6 +9,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using AgentSubscriptionTracker.App.Theming;
 
 namespace AgentSubscriptionTracker.App.ViewModels;
@@ -33,6 +34,7 @@ public sealed class ThemeEditorViewModel : INotifyPropertyChanged
     private string _name;
     private string? _backgroundImagePath;
     private byte[]? _pendingBackgroundPngBytes;
+    private BitmapSource? _backgroundImagePreview;
     private string _backgroundFallbackColor;
     private ThemeFontSet _fonts;
     private ThemeBrushSet _brushes;
@@ -66,6 +68,15 @@ public sealed class ThemeEditorViewModel : INotifyPropertyChanged
         _fonts = seed.Fonts;
         _brushes = seed.Brushes;
         _severityBands = seed.SeverityBands;
+
+        // Seed the live preview with the source theme's already-saved image (if any), reusing
+        // the same validation/decode pipeline as import — so opening the editor on an existing
+        // themed background shows it immediately, before any new import this session.
+        if (_backgroundImagePath is not null && sourceFolderPath is not null)
+        {
+            var seeded = imageValidator.Validate(sourceFolderPath, _backgroundImagePath);
+            _backgroundImagePreview = seeded.Error is null ? seeded.Image : null;
+        }
     }
 
     /// <inheritdoc />
@@ -89,6 +100,12 @@ public sealed class ThemeEditorViewModel : INotifyPropertyChanged
     }
 
     public string? BackgroundImagePath => _backgroundImagePath;
+
+    /// <summary>Decoded background image for the live preview pane — the just-imported
+    /// candidate this session, or the source theme's existing image if none was imported
+    /// yet, or null when there is no usable background image. Never written to disk;
+    /// purely for <see cref="Views.ThemeEditorWindow"/>'s preview.</summary>
+    public BitmapSource? BackgroundImagePreview => _backgroundImagePreview;
 
     public ThemeFontSet Fonts
     {
@@ -159,8 +176,10 @@ public sealed class ThemeEditorViewModel : INotifyPropertyChanged
 
             _pendingBackgroundPngBytes = bytes;
             _backgroundImagePath = "background.png";
+            _backgroundImagePreview = result.Image;
             ImportError = null;
             OnPropertyChanged(nameof(BackgroundImagePath));
+            OnPropertyChanged(nameof(BackgroundImagePreview));
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -180,8 +199,10 @@ public sealed class ThemeEditorViewModel : INotifyPropertyChanged
     {
         _backgroundImagePath = null;
         _pendingBackgroundPngBytes = null;
+        _backgroundImagePreview = null;
         ImportError = null;
         OnPropertyChanged(nameof(BackgroundImagePath));
+        OnPropertyChanged(nameof(BackgroundImagePreview));
     }
 
     /// <summary>Validates and persists the draft. Built-ins always route through
@@ -287,8 +308,8 @@ public sealed class ThemeEditorViewModel : INotifyPropertyChanged
     {
         BackgroundImageValidationError.NotAPng => "The selected file is not a PNG image.",
         BackgroundImageValidationError.CorruptOrTruncated => "The selected PNG could not be decoded.",
-        BackgroundImageValidationError.FileTooLarge => "The selected file exceeds the 2 MB size limit.",
-        BackgroundImageValidationError.DimensionsTooLarge => "The selected image exceeds 1024x1536 pixels.",
+        BackgroundImageValidationError.FileTooLarge => "The selected file exceeds the 30 MB size limit.",
+        BackgroundImageValidationError.DimensionsTooLarge => "The selected image exceeds 8192x8192 pixels.",
         BackgroundImageValidationError.NoAlphaChannel => "The selected PNG has no alpha channel.",
         BackgroundImageValidationError.FileNotFound => "The selected file could not be found.",
         BackgroundImageValidationError.PathOutsideThemeFolder => "The selected file path is not valid.",
